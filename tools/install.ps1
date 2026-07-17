@@ -32,11 +32,11 @@ $ErrorActionPreference = "Stop"
 
 function Write-Banner {
     Write-Host ""
-    Write-Host " _   _ _   _  ___ _____    ___  ___   _   _  _____" -ForegroundColor Cyan
-    Write-Host "| | | | \ | |/ _ \_   _|  / _ \|_ _| \ | |/ / _ `" -ForegroundColor Cyan
-    Write-Host "| | | |  \| | | | || |   | | | || ||  \| | | | |" -ForegroundColor Cyan
-    Write-Host "| |_| | |\  | |_| || |   | |_| || || |\  | |_| |" -ForegroundColor Cyan
-    Write-Host " \___/|_| \_|\___/ |_|    \___/___|_| \_|\___/" -ForegroundColor Cyan
+    Write-Host ' _   _ _   _  ___ _____    ___  ___   _   _  _____' -ForegroundColor Cyan
+    Write-Host '| | | | \ | |/ _ \_   _|  / _ \|_ _| \ | |/ / _ \' -ForegroundColor Cyan
+    Write-Host '| | | |  \| | | | || |   | | | || ||  \| | | | |' -ForegroundColor Cyan
+    Write-Host '| |_| | |\  | |_| || |   | |_| || || |\  | |_| |' -ForegroundColor Cyan
+    Write-Host ' \___/|_| \_|\___/ |_|    \___/___|_| \_|\___/' -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   Remote Installer v2.0" -ForegroundColor Yellow
     Write-Host ""

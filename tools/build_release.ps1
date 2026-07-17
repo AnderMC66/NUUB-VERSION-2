@@ -54,11 +54,11 @@ function Invoke-OrDie {
 # ─── Banner ──────────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host " _   _ _   _  ___ _____    ___  ___   _   _  _____" -ForegroundColor Cyan
-Write-Host "| | | | \ | |/ _ \_   _|  / _ \|_ _| \ | |/ / _ `" -ForegroundColor Cyan
-Write-Host "| | | |  \| | | | || |   | | | || ||  \| | | | |" -ForegroundColor Cyan
-Write-Host "| |_| | |\  | |_| || |   | |_| || || |\  | |_| |" -ForegroundColor Cyan
-Write-Host " \___/|_| \_|\___/ |_|    \___/___|_| \_|\___/" -ForegroundColor Cyan
+Write-Host ' _   _ _   _  ___ _____    ___  ___   _   _  _____' -ForegroundColor Cyan
+Write-Host '| | | | \ | |/ _ \_   _|  / _ \|_ _| \ | |/ / _ \' -ForegroundColor Cyan
+Write-Host '| | | |  \| | | | || |   | | | || ||  \| | | | |' -ForegroundColor Cyan
+Write-Host '| |_| | |\  | |_| || |   | |_| || || |\  | |_| |' -ForegroundColor Cyan
+Write-Host ' \___/|_| \_|\___/ |_|    \___/___|_| \_|\___/' -ForegroundColor Cyan
 Write-Host ""
 Write-Host "   Build & Release Script v2.0" -ForegroundColor Yellow
 Write-Host "   Version: $Version" -ForegroundColor Yellow
@@ -68,11 +68,26 @@ Write-Host ""
 
 Write-Step "1/6" "Verifying Build Environment"
 
-# VCPKG_ROOT
+# VCPKG_ROOT - auto-detect if not set
 if (-not $VcpkgRoot -or -not (Test-Path $VcpkgRoot)) {
-    Write-Err "VCPKG_ROOT not found. Set the VCPKG_ROOT environment variable."
-    Write-Info "Example: `$env:VCPKG_ROOT = 'C:\vcpkg'"
-    exit 1
+    # Try common installation locations
+    $candidates = @(
+        $env:VCPKG_ROOT,
+        "C:\vcpkg",
+        "D:\vcpkg",
+        "$env:USERPROFILE\vcpkg",
+        "$env:USERPROFILE\Documents\vcpkg",
+        "$env:LOCALAPPDATA\vcpkg"
+    )
+    $found = $candidates | Where-Object { $_ -and (Test-Path (Join-Path $_ "vcpkg.exe")) } | Select-Object -First 1
+    if ($found) {
+        $VcpkgRoot = $found
+        Write-Info "Auto-detected VCPKG_ROOT: $VcpkgRoot"
+    } else {
+        Write-Err "vcpkg.exe not found. Set VCPKG_ROOT or install vcpkg."
+        Write-Info "Install: git clone https://github.com/microsoft/vcpkg.git C:\vcpkg && C:\vcpkg\bootstrap-vcpkg.bat"
+        exit 1
+    }
 }
 Write-OK "VCPKG_ROOT: $VcpkgRoot"
 
