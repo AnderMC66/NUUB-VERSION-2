@@ -269,7 +269,7 @@ if ($Publish) {
 
 ### Quick Install (one line)
 ``````powershell
-iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1)
+iex (irm https://github.com/AnderMC66/NUUB-VERSION-2/releases/latest/download/install.ps1)
 ``````
 
 ### Manual Install
@@ -309,5 +309,5 @@ Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Upload $zipName to GitHub Releases"
 Write-Host "  2. Users install with:"
-Write-Host '     iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1)' -ForegroundColor Cyan
+Write-Host '     iex (irm https://github.com/AnderMC66/NUUB-VERSION-2/releases/latest/download/install.ps1)' -ForegroundColor Cyan
 Write-Host ""

