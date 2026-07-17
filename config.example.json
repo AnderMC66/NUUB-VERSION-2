@@ -1,0 +1,13 @@
+{
+    "telegram_bot_token": "YOUR_BOT_TOKEN_HERE",
+    "admin_chat_id": 0,
+    "admin_chat_ids": [],
+    "pc_identifier": "PC-Principal",
+    "encryption_password": "CHANGE_THIS_PASSWORD",
+    "master_log_filename": "log_master.txt",
+    "activity_log_filename": "activity_log.csv",
+    "auto_start_entry_name": "SystemCoreService",
+    "log_filename": "nuub.log",
+    "heartbeat_interval_minutes": 30,
+    "c2_encryption_key": ""
+}
