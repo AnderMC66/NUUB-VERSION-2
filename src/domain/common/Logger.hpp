@@ -3,7 +3,6 @@
 #include <string>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include <spdlog/sinks/stdout_sinks.h>
 
 namespace nuub::domain {
 
@@ -11,7 +10,8 @@ class Logger {
     inline static std::shared_ptr<spdlog::logger> instance_;
 
 public:
-    static void init(const std::string& log_file = "nuub.log") {
+    // File-only logger — no console output in production
+    static void init(const std::string& log_file = "agent.log") {
         std::vector<spdlog::sink_ptr> sinks;
 
         // File sink with rotation (5MB, 3 files)
@@ -19,11 +19,9 @@ public:
             log_file, 5 * 1024 * 1024, 3);
         sinks.push_back(file_sink);
 
-        // Console sink
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
-        sinks.push_back(console_sink);
+        // No console sink — avoids detection and stdout leakage
 
-        instance_ = std::make_shared<spdlog::logger>("nuub", sinks.begin(), sinks.end());
+        instance_ = std::make_shared<spdlog::logger>("", sinks.begin(), sinks.end());
         instance_->set_level(spdlog::level::info);
         instance_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
         spdlog::set_default_logger(instance_);

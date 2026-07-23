@@ -1,20 +1,22 @@
 #pragma once
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <Psapi.h>
 #include <intrin.h>
-#include <tlhelp32.h>
+#include <cstring>
+
+#pragma comment(lib, "Psapi.lib")
 
 namespace nuub::domain::anti {
 
 class AntiDebug {
 public:
-    // Check if debugger is present
     static bool is_debugger_present() {
         return IsDebuggerPresent() != 0;
     }
 
-    // Check PEB->BeingDebugged directly
     static bool check_peb_debugger() {
         #ifdef _WIN64
         auto* peb = reinterpret_cast<uintptr_t*>(__readgsqword(0x60));
@@ -24,36 +26,32 @@ public:
         return *reinterpret_cast<uint8_t*>(peb + 2) != 0;
     }
 
-    // Check NtGlobalFlag (debug flags)
     static bool check_nt_global_flag() {
         #ifdef _WIN64
         auto* peb = reinterpret_cast<uint8_t*>(__readgsqword(0x60));
+        uint32_t offset = 0xBC;
         #else
         auto* peb = reinterpret_cast<uint8_t*>(__readfsdword(0x30));
+        uint32_t offset = 0x68;
         #endif
-        // Debug heap adds flags: 0x70 (FLG_HEAP_ENABLE_TAIL_CHECK | FLG_HEAP_ENABLE_FREE_CHECK | FLG_HEAP_VALIDATE_PARAMETERS)
-        uint32_t nt_global_flag = *reinterpret_cast<uint32_t*>(peb + 0xBC); // 64-bit offset
+        uint32_t nt_global_flag = *reinterpret_cast<uint32_t*>(peb + offset);
         return (nt_global_flag & 0x70) != 0;
     }
 
-    // Check timing (single-step debugging)
     static bool check_timing() {
         LARGE_INTEGER freq, start, end;
         QueryPerformanceFrequency(&freq);
         QueryPerformanceCounter(&start);
 
-        // Do some work
         volatile int x = 0;
         for (int i = 0; i < 1000; ++i) x += i;
 
         QueryPerformanceCounter(&end);
 
         double elapsed = (double)(end.QuadPart - start.QuadPart) / freq.QuadPart;
-        // Normal execution should be microseconds, debugging adds milliseconds
-        return elapsed > 0.01; // 10ms threshold
+        return elapsed > 0.01;
     }
 
-    // Check for hardware breakpoints (DR registers)
     static bool check_hardware_breakpoints() {
         CONTEXT ctx{};
         ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
@@ -63,7 +61,7 @@ public:
         return false;
     }
 
-    // Check for common analysis tools
+    // Enumerate processes using EnumProcesses (avoids tlhelp32.h /Za issues)
     static bool check_analysis_tools() {
         const char* tools[] = {
             "ollydbg.exe", "x64dbg.exe", "x32dbg.exe",
@@ -73,45 +71,75 @@ public:
             "processhacker.exe", "processhacker.bin",
             "cheatengine.exe", "cheatengine-i386.exe",
             "dnspy.exe", "de4dot.exe",
+            "charles.exe", "tcpview.exe",
+            "autoruns.exe", "regshot.exe",
+            "apimonitor.exe", "binary.ninja",
+            "ghidra.exe", "ghidraRun.exe",
+            "radare2.exe", "r2.exe",
+            "httpdebugger.exe", "httpdebuggerpro.exe",
+            "mitmproxy.exe", "dumpcap.exe",
+            "windbg.exe", "cdb.exe", "ntsd.exe",
+            "dbgview.exe", "spyxx.exe",
             nullptr
         };
 
-        for (int i = 0; tools[i] != nullptr; ++i) {
-            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, 0);
-            if (hProcess) {
-                char exe_path[MAX_PATH]{};
-                DWORD size = MAX_PATH;
-                if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
-                    // Extract filename
-                    char* filename = strrchr(exe_path, '\\');
-                    if (filename) {
-                        filename++;
-                        for (int j = 0; tools[j] != nullptr; ++j) {
-                            if (_stricmp(filename, tools[j]) == 0) {
-                                CloseHandle(hProcess);
-                                return true;
-                            }
+        DWORD processes[1024]{};
+        DWORD cb_needed = 0;
+        if (!EnumProcesses(processes, sizeof(processes), &cb_needed)) return false;
+
+        DWORD num_processes = cb_needed / sizeof(DWORD);
+        bool found = false;
+
+        for (DWORD i = 0; i < num_processes && !found; ++i) {
+            if (processes[i] == 0) continue;
+
+            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
+            if (!hProcess) continue;
+
+            char exe_path[MAX_PATH]{};
+            DWORD size = MAX_PATH;
+            if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
+                const char* filename = strrchr(exe_path, '\\');
+                if (filename) {
+                    filename++;
+                    for (int j = 0; tools[j] != nullptr; ++j) {
+                        if (_stricmp(filename, tools[j]) == 0) {
+                            found = true;
+                            break;
                         }
                     }
                 }
-                CloseHandle(hProcess);
             }
+            CloseHandle(hProcess);
         }
-        return false;
+
+        return found;
     }
 
-    // Combined check
+    // NtSetInformationThread with ThreadHideFromDebugger
+    static void hide_from_debugger() {
+        typedef LONG (NTAPI* NtSetInformationThread_t)(HANDLE, ULONG, PVOID, ULONG);
+
+        auto NtSetInformationThread = reinterpret_cast<NtSetInformationThread_t>(
+            GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtSetInformationThread"));
+
+        if (NtSetInformationThread) {
+            NtSetInformationThread(GetCurrentThread(), 0x11, nullptr, 0);
+        }
+    }
+
     static bool should_terminate() {
         return is_debugger_present() ||
                check_peb_debugger() ||
+               check_nt_global_flag() ||
                check_hardware_breakpoints() ||
-               check_analysis_tools();
+               check_analysis_tools() ||
+               check_timing();
     }
 };
 
 class AntiVM {
 public:
-    // Check for VM-specific registry keys
     static bool check_vm_registry() {
         const char* vm_keys[] = {
             "SOFTWARE\\VMware, Inc.\\VMware Tools",
@@ -119,6 +147,8 @@ public:
             "SYSTEM\\CurrentControlSet\\Services\\VBoxGuest",
             "SYSTEM\\CurrentControlSet\\Services\\vmci",
             "SYSTEM\\CurrentControlSet\\Services\\vmhgfs",
+            "SYSTEM\\CurrentControlSet\\Services\\VBoxMouse",
+            "SYSTEM\\CurrentControlSet\\Services\\VBoxSF",
             nullptr
         };
 
@@ -132,13 +162,16 @@ public:
         return false;
     }
 
-    // Check for VM-specific files
     static bool check_vm_files() {
         const char* vm_files[] = {
             "C:\\Windows\\System32\\vmGuestLib.dll",
             "C:\\Windows\\System32\\vm3dum.dll",
             "C:\\Windows\\System32\\VBoxHook.dll",
-            "C:\\Windows\\System32\\SbieDll.dll", // Sandboxie
+            "C:\\Windows\\System32\\SbieDll.dll",
+            "C:\\Windows\\System32\\VBoxGuest.sys",
+            "C:\\Windows\\System32\\VBoxTray.exe",
+            "C:\\Windows\\System32\\vmtoolsd.exe",
+            "C:\\Windows\\System32\\vmwaretray.exe",
             nullptr
         };
 
@@ -151,12 +184,11 @@ public:
         return false;
     }
 
-    // Check for VM-specific processes via WMI or simple file check
+    // Check for VM processes using EnumProcesses
     static bool check_vm_processes() {
-        // Check for VM-specific DLLs as proxy for VM processes
         const char* vm_dlls[] = {
             "vmGuestLib.dll", "vm3dum.dll", "VBoxHook.dll",
-            "SbieDll.dll", // Sandboxie
+            "SbieDll.dll",
             nullptr
         };
 
@@ -164,23 +196,97 @@ public:
             HMODULE hMod = GetModuleHandleA(vm_dlls[i]);
             if (hMod) return true;
         }
-        return false;
+
+        // Check via process enumeration
+        DWORD processes[1024]{};
+        DWORD cb_needed = 0;
+        if (!EnumProcesses(processes, sizeof(processes), &cb_needed)) return false;
+
+        DWORD num_processes = cb_needed / sizeof(DWORD);
+        const char* vm_procs[] = {
+            "vmtoolsd.exe", "vmwaretray.exe", "vmware.exe",
+            "VBoxService.exe", "VBoxTray.exe",
+            "qemu-ga.exe", "vdagent.exe",
+            nullptr
+        };
+
+        bool found = false;
+        for (DWORD i = 0; i < num_processes && !found; ++i) {
+            if (processes[i] == 0) continue;
+
+            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
+            if (!hProcess) continue;
+
+            char exe_path[MAX_PATH]{};
+            DWORD size = MAX_PATH;
+            if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
+                const char* filename = strrchr(exe_path, '\\');
+                if (filename) {
+                    filename++;
+                    for (int j = 0; vm_procs[j] != nullptr; ++j) {
+                        if (_stricmp(filename, vm_procs[j]) == 0) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            CloseHandle(hProcess);
+        }
+
+        return found;
     }
 
-    // Check CPUID for VM hypervisor bit
     static bool check_cpuid_hypervisor() {
         int cpuInfo[4]{};
         __cpuid(cpuInfo, 1);
-        // Bit 31 of ECX indicates hypervisor present
         return (cpuInfo[2] & (1 << 31)) != 0;
     }
 
-    // Combined check
+    static bool check_vm_bios() {
+        HKEY hkey;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+            "HARDWARE\\DESCRIPTION\\System\\BIOS",
+            0, KEY_READ, &hkey) == ERROR_SUCCESS) {
+
+            char value[256]{};
+            DWORD size = sizeof(value);
+            DWORD type = 0;
+
+            const char* bios_values[] = {
+                "SystemManufacturer", "SystemProductName",
+                "BIOSVendor", "BIOSVersion",
+                nullptr
+            };
+
+            for (int i = 0; bios_values[i] != nullptr; ++i) {
+                size = sizeof(value);
+                if (RegQueryValueExA(hkey, bios_values[i], nullptr, &type,
+                    reinterpret_cast<LPBYTE>(value), &size) == ERROR_SUCCESS) {
+                    const char* vm_strings[] = {
+                        "vmware", "virtualbox", "vbox", "qemu",
+                        "xen", "hyper-v", "microsoft corporation",
+                        nullptr
+                    };
+                    for (int j = 0; vm_strings[j] != nullptr; ++j) {
+                        if (_stricmp(value, vm_strings[j]) == 0) {
+                            RegCloseKey(hkey);
+                            return true;
+                        }
+                    }
+                }
+            }
+            RegCloseKey(hkey);
+        }
+        return false;
+    }
+
     static bool is_virtual_machine() {
         return check_cpuid_hypervisor() ||
                check_vm_registry() ||
                check_vm_files() ||
-               check_vm_processes();
+               check_vm_processes() ||
+               check_vm_bios();
     }
 };
 

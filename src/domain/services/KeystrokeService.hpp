@@ -19,9 +19,19 @@ class KeystrokeService final : public IKeystrokeService {
     std::mutex mutex_;
     bool paused_ = false;
 
+    // Persistent log settings
+    std::string log_path_;
+    size_t max_buffer_size_ = 50000;  // Max keystrokes before rotation
+    bool persistence_enabled_ = false;
+
     void check_keywords(const std::string& key);
+    void flush_to_disk();
+    void rotate_if_needed();
 
 public:
+    KeystrokeService() = default;
+    explicit KeystrokeService(const std::string& log_path, size_t max_buffer = 50000);
+
     void process_press(const std::string& key) override;
     void process_release(const std::string& key) override;
     void pause() override;
@@ -34,6 +44,10 @@ public:
     void remove_keyword(const std::string& keyword) override;
     [[nodiscard]] std::vector<std::string> get_keywords() const override;
     void set_keyword_callback(std::function<void(const std::string&)> callback) override;
+
+    // Persistence controls
+    void enable_persistence(const std::string& log_path, size_t max_buffer = 50000);
+    [[nodiscard]] size_t buffer_size() const;
 };
 
 } // namespace nuub::domain::services

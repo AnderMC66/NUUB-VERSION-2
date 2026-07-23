@@ -25,6 +25,7 @@ public:
     domain::Result<void> handle_mkdir(const std::string& target, const std::string& path);
     domain::Result<void> handle_rm(const std::string& target, const std::string& path);
     domain::Result<void> handle_cat(const std::string& target, const std::string& path);
+    domain::Result<void> handle_send(const std::string& target, const std::string& path);
 };
 
 } // namespace nuub::application::commands
