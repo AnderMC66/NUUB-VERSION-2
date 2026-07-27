@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <algorithm>
+#include <random>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -109,13 +110,16 @@ bool read_yes_no(const std::string& prompt, bool default_value = false) {
     return input == "y" || input == "yes";
 }
 
-// Generate random string
+// Generate random string (cryptographically secure)
 std::string random_string(int length) {
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     std::string result;
     result.resize(length);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
     for (int i = 0; i < length; ++i) {
-        result[i] = charset[rand() % (sizeof(charset) - 1)];
+        result[i] = charset[dist(gen)];
     }
     return result;
 }

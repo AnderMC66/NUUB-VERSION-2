@@ -14,12 +14,19 @@
 
 namespace nuub::infrastructure::system {
 
+// Max download size: 50MB
+static constexpr size_t MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024;
+
 static size_t write_file_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
     auto* vec = static_cast<std::vector<uint8_t>*>(userdata);
+    size_t total = size * nmemb;
+    if (vec->size() + total > MAX_DOWNLOAD_SIZE) {
+        return 0; // Abort: exceeded max size
+    }
     vec->insert(vec->end(),
         reinterpret_cast<uint8_t*>(ptr),
-        reinterpret_cast<uint8_t*>(ptr) + size * nmemb);
-    return size * nmemb;
+        reinterpret_cast<uint8_t*>(ptr) + total);
+    return total;
 }
 
 std::string WindowsDownloadExecService::download_and_execute(const std::string& url) {
@@ -36,6 +43,7 @@ std::string WindowsDownloadExecService::download_and_execute(const std::string& 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_MAXFILESIZE, static_cast<long>(MAX_DOWNLOAD_SIZE));
 
     CURLcode res = curl_easy_perform(curl);
     long http_code = 0;

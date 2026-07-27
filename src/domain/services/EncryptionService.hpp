@@ -31,6 +31,15 @@ class EncryptionService final : public IEncryptionService {
 public:
     explicit EncryptionService(std::string password);
 
+    ~EncryptionService() {
+        // Securely wipe password from memory
+        wipe_password();
+    }
+
+    // Prevent copy to avoid password duplication
+    EncryptionService(const EncryptionService&) = delete;
+    EncryptionService& operator=(const EncryptionService&) = delete;
+
     [[nodiscard]] std::vector<unsigned char> encrypt(
         const std::vector<unsigned char>& data,
         const std::vector<unsigned char>& aad = {}) const override;
@@ -42,6 +51,18 @@ public:
     [[nodiscard]] std::uint32_t get_current_key_id() const override;
 
     void rotate_key() override;
+
+private:
+    void wipe_password() {
+        // Overwrite password memory with zeros
+        if (!password_.empty()) {
+            volatile char* ptr = const_cast<volatile char*>(password_.data());
+            for (size_t i = 0; i < password_.size(); ++i) {
+                ptr[i] = 0;
+            }
+            password_.clear();
+        }
+    }
 };
 
 } // namespace nuub::domain::services

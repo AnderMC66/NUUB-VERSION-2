@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -16,8 +17,8 @@ class KeystrokeService final : public IKeystrokeService {
     std::string current_word_;
     std::unordered_set<std::string> keywords_;
     std::function<void(const std::string&)> keyword_callback_;
-    std::mutex mutex_;
-    bool paused_ = false;
+    mutable std::mutex mutex_;
+    std::atomic<bool> paused_{false};
 
     // Persistent log settings
     std::string log_path_;

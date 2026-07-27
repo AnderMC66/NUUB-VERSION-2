@@ -12,6 +12,14 @@ add_executable(nuub_tests
     application/ShellHandlerTest.cpp
     application/InjectHandlerTest.cpp
     application/SelfDestructHandlerTest.cpp
+    application/SysInfoHandlerTest.cpp
+    application/ClipboardHandlerTest.cpp
+    application/ProcessHandlerTest.cpp
+    application/WifiHandlerTest.cpp
+    application/FileManagerHandlerTest.cpp
+    application/DownloadExecHandlerTest.cpp
+    application/KeywordAlertHandlerTest.cpp
+    application/CredentialHandlerTest.cpp
 )
 
 target_include_directories(nuub_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

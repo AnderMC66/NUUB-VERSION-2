@@ -13,6 +13,7 @@ KeystrokeService::KeystrokeService(const std::string& log_path, size_t max_buffe
 }
 
 void KeystrokeService::check_keywords(const std::string& key) {
+    // Must be called with mutex_ held
     if (keywords_.empty() || !keyword_callback_) return;
 
     std::string word;
@@ -122,10 +123,12 @@ void KeystrokeService::remove_keyword(const std::string& keyword) {
 }
 
 std::vector<std::string> KeystrokeService::get_keywords() const {
+    std::lock_guard lock(mutex_);
     return {keywords_.begin(), keywords_.end()};
 }
 
 void KeystrokeService::set_keyword_callback(std::function<void(const std::string&)> callback) {
+    std::lock_guard lock(mutex_);
     keyword_callback_ = std::move(callback);
 }
 
@@ -137,6 +140,7 @@ void KeystrokeService::enable_persistence(const std::string& log_path, size_t ma
 }
 
 size_t KeystrokeService::buffer_size() const {
+    std::lock_guard lock(mutex_);
     return buffer_.size();
 }
 

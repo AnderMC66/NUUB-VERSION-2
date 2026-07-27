@@ -1,7 +1,7 @@
 #include "application/commands/ProcessHandler.hpp"
 
 #include <algorithm>
-#include <cstdlib>
+#include <stdexcept>
 
 namespace nuub::application::commands {
 
@@ -37,8 +37,15 @@ domain::Result<void> ProcessHandler::handle_kill(const std::string& target, cons
         return domain::Result<void>::success();
     }
 
-    int pid = std::atoi(pid_str.c_str());
-    if (pid <= 0) {
+    int pid = 0;
+    try {
+        size_t pos = 0;
+        pid = std::stoi(pid_str, &pos);
+        if (pos != pid_str.size() || pid <= 0) {
+            reporter_.send_message("PID invalido: " + pid_str);
+            return domain::Result<void>::success();
+        }
+    } catch (const std::exception&) {
         reporter_.send_message("PID invalido: " + pid_str);
         return domain::Result<void>::success();
     }
