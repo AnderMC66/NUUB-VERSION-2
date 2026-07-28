@@ -13,6 +13,7 @@ CredentialHandler::CredentialHandler(interfaces::IReporter& reporter, std::strin
     , pc_id_(std::move(pc_id)) {}
 
 bool CredentialHandler::matches(const std::string& target) const {
+    if (target.empty()) return true;
     std::string lower = target;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     std::string lower_pc = pc_id_;

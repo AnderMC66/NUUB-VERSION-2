@@ -225,7 +225,7 @@ cmake --build build --config Release
 
 ```
 build\Release\nuub.exe              → Ejecutable principal
-build\tests\Release\nuub_tests.exe  → Tests (81/81)
+build\tests\Release\nuub_tests.exe  → Tests (122+)
 ```
 
 ## Arquitectura
@@ -257,19 +257,26 @@ src/
 
 ```bash
 ctest --test-dir build --build-config Release
-# 81/81 tests pasan
+# 122+ tests pasan
 ```
 
 ### Cobertura
 
 | Suite | Tests | Qué cubre |
 |-------|-------|-----------|
+| **Domain** | | |
 | KeystrokeService | 6 | Core logging, pause/resume, keywords |
 | EncryptionService | 10 | AES-GCM, key rotation, tampering |
 | Admin | 6 | Auth, multi-admin, accessors |
 | AdminPermission | 13 | Full/Limited/Readonly, required_permission, can_execute |
 | AdminLegacy | 2 | Backward compat single/multi admin |
 | AuditLogger | 6 | Log commands, denied, events, timestamps |
+| StringTable | 10 | Rolling XOR store/get, init, overwrite, edge cases |
+| ConfigEncryption | 13 | AES-GCM+Argon2id, roundtrip, tamper, save/load |
+| Compressor | 8 | Zlib compress/decompress roundtrip, edge cases |
+| Result | 8 | Value/Void monad, success/failure, custom types |
+| Obfuscate | 14 | Compile-time encryption, macros, runtime encryptor |
+| **Application** | | |
 | CommandHandler | 5 | Target matching, start/status/shutdown |
 | MediaHandler | 9 | Photo, video, audio, screenshot |
 | LocationHandler | 4 | Geolocation, maps link |
@@ -277,6 +284,20 @@ ctest --test-dir build --build-config Release
 | InjectHandler | 12 | Target matching, arg validation, PID checks, URL fallback |
 | SelfDestructHandler | 2 | Constructor, target matching |
 | SelfDestructPermission | 1 | Uninstall requires FULL |
+| SysInfoHandler | 3 | System info, target matching |
+| ClipboardHandler | 4 | Get/set clipboard, target matching |
+| ProcessHandler | 5 | List/kill processes, target matching |
+| WifiHandler | 3 | WiFi networks, target matching |
+| FileManagerHandler | 8 | ls, mkdir, rm, cat, send, target matching |
+| DownloadExecHandler | 4 | URL download+exec, target matching |
+| KeywordAlertHandler | 5 | Add/remove/list alerts, target matching |
+| CredentialHandler | 8 | Creds, wifi/win/env/git creds, clip management |
+| **Infrastructure** | | |
+| KeyResolver | 14 | VK code mapping, special keys, modifiers, alphanumeric |
+| ActivityLogger | 5 | Event logging, file I/O, CSV format |
+| HeartbeatService | 8 | Start/stop lifecycle, edge cases |
+| IPGeolocationService | 5 | IP geolocation API response validation |
+| SelfDestructService | 5 | File cleanup, config/log/extra file deletion |
 
 ## Disclaimer
 

@@ -118,15 +118,15 @@ public:
         return Permission::FULL; // Unknown commands require FULL
     }
 
-    [[nodiscard]] const std::vector<AdminInfo>& admins() const { return admins_; }
+    [[nodiscard]] const std::vector<AdminInfo>& admins() const noexcept { return admins_; }
 
-    [[nodiscard]] std::vector<std::int64_t> chat_ids() const {
+    [[nodiscard]] std::vector<std::int64_t> chat_ids() const noexcept {
         std::vector<std::int64_t> ids;
         for (const auto& a : admins_) ids.push_back(a.chat_id);
         return ids;
     }
 
-    [[nodiscard]] std::int64_t primary_chat_id() const {
+    [[nodiscard]] std::int64_t primary_chat_id() const noexcept {
         return admins_.empty() ? 0 : admins_.front().chat_id;
     }
 

@@ -48,8 +48,12 @@ std::optional<std::string> OpenCVMediaCapture::take_video(int duration_sec) {
         std::chrono::system_clock::now().time_since_epoch()).count();
 
     std::string path = "video_" + pc_id_ + "_" + std::to_string(ts) + ".mp4";
-    int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+    int fourcc = cv::VideoWriter::fourcc('a', 'v', 'c', '1');
     cv::VideoWriter writer(path, fourcc, 20.0, cv::Size(640, 480));
+    if (!writer.isOpened()) {
+        fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+        writer.open(path, fourcc, 20.0, cv::Size(640, 480));
+    }
 
     auto start = std::chrono::steady_clock::now();
     cv::Mat frame;
@@ -180,8 +184,12 @@ std::optional<std::string> OpenCVMediaCapture::screen_record(int duration_sec) {
     int width = GetSystemMetrics(SM_CXSCREEN);
     int height = GetSystemMetrics(SM_CYSCREEN);
 
-    int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+    int fourcc = cv::VideoWriter::fourcc('a', 'v', 'c', '1');
     cv::VideoWriter writer(path, fourcc, 15.0, cv::Size(width, height));
+    if (!writer.isOpened()) {
+        fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+        writer.open(path, fourcc, 15.0, cv::Size(width, height));
+    }
     if (!writer.isOpened()) return std::nullopt;
 
     auto start = std::chrono::steady_clock::now();

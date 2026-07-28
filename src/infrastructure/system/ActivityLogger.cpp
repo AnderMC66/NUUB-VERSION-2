@@ -5,6 +5,12 @@
 #include <iomanip>
 #include <sstream>
 
+#ifdef _WIN32
+#define CTIME_S(buf, time) localtime_s(buf, time)
+#else
+#define CTIME_S(buf, time) localtime_r(time, buf)
+#endif
+
 namespace nuub::infrastructure::system {
 
 ActivityLogger::ActivityLogger(std::string log_path, std::string pc_id)
@@ -16,7 +22,7 @@ void ActivityLogger::register_event(const std::string& event_type) {
     auto now = std::chrono::system_clock::now();
     auto time = std::chrono::system_clock::to_time_t(now);
     std::tm tm_buf{};
-    localtime_s(&tm_buf, &time);
+    CTIME_S(&tm_buf, &time);
 
     std::ostringstream oss;
     oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
@@ -40,7 +46,7 @@ void ActivityLogger::register_event(const domain::entities::ActivityEvent& event
 
     auto time = std::chrono::system_clock::to_time_t(event.timestamp);
     std::tm tm_buf{};
-    localtime_s(&tm_buf, &time);
+    CTIME_S(&tm_buf, &time);
 
     std::ostringstream oss;
     oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");

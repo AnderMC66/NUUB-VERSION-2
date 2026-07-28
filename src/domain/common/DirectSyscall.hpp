@@ -83,41 +83,49 @@ public:
     SyscallResolver() : ntdll_(GetModuleHandleA("ntdll.dll")) {}
 
     NtAllocateVirtualMemory_t NtAllocateVirtualMemory() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtAllocateVirtualMemory_t>(
             GetProcAddress(ntdll_, "NtAllocateVirtualMemory"));
     }
 
     NtWriteVirtualMemory_t NtWriteVirtualMemory() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtWriteVirtualMemory_t>(
             GetProcAddress(ntdll_, "NtWriteVirtualMemory"));
     }
 
     NtProtectVirtualMemory_t NtProtectVirtualMemory() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtProtectVirtualMemory_t>(
             GetProcAddress(ntdll_, "NtProtectVirtualMemory"));
     }
 
     NtCreateThreadEx_t NtCreateThreadEx() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtCreateThreadEx_t>(
             GetProcAddress(ntdll_, "NtCreateThreadEx"));
     }
 
     NtResumeThread_t NtResumeThread() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtResumeThread_t>(
             GetProcAddress(ntdll_, "NtResumeThread"));
     }
 
     NtClose_t NtClose() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtClose_t>(
             GetProcAddress(ntdll_, "NtClose"));
     }
 
     NtOpenSection_t NtOpenSection() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtOpenSection_t>(
             GetProcAddress(ntdll_, "NtOpenSection"));
     }
 
     NtMapViewOfSection_t NtMapViewOfSection() {
+        if (!ntdll_) return nullptr;
         return reinterpret_cast<NtMapViewOfSection_t>(
             GetProcAddress(ntdll_, "NtMapViewOfSection"));
     }

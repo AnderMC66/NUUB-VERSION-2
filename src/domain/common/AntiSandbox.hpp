@@ -460,7 +460,7 @@ public:
 
 // Static member definitions
 namespace nuub::domain::anti {
-    POINT EnvironmentKeying::last_mouse_pos_ = {0, 0};
-    bool EnvironmentKeying::mouse_baseline_set_ = false;
+    inline POINT EnvironmentKeying::last_mouse_pos_ = {0, 0};
+    inline bool EnvironmentKeying::mouse_baseline_set_ = false;
 }
 #endif

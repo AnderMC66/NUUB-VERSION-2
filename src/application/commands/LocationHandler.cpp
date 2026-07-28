@@ -13,6 +13,7 @@ LocationHandler::LocationHandler(
     , pc_id_(std::move(pc_id)) {}
 
 bool LocationHandler::matches(const std::string& target) const {
+    if (target.empty()) return true;
     std::string lower = target;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     std::string lower_pc = pc_id_;
@@ -31,6 +32,21 @@ domain::Result<void> LocationHandler::handle_locate(const std::string& target) {
     text += "Ciudad: " + info["city"] + "\n";
     text += "Region: " + info["region"] + "\n";
     text += "Pais: " + info["country"];
+
+    if (info.count("lat") && info.count("lon")) {
+        text += "\nLat: " + info["lat"] + "\nLon: " + info["lon"];
+    }
+    if (info.count("accuracy")) {
+        text += "\nPrecision: " + info["accuracy"];
+    }
+    if (info.count("source")) {
+        std::string src = info["source"];
+        text += "\nFuente: ";
+        if (src == "apple_wps") text += "Apple WPS (WiFi, ~15m)";
+        else if (src == "windows_location") text += "Windows Location (WiFi+GPS)";
+        else if (src == "wifi_google") text += "Google WiFi Geolocation";
+        else text += "IP (ip-api.com)";
+    }
 
     if (info.count("maps_link")) {
         text += "\n[Google Maps](" + info["maps_link"] + ")";

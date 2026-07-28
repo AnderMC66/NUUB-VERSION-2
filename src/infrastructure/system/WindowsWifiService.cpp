@@ -5,6 +5,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "domain/common/StringTable.hpp"
 
@@ -73,6 +74,86 @@ std::string WindowsWifiService::get_saved_networks() {
     }
 
     return output;
+}
+
+std::vector<application::interfaces::WifiAccessPoint> WindowsWifiService::get_visible_networks() {
+    std::vector<application::interfaces::WifiAccessPoint> aps;
+
+    std::string cmd = domain::StringTable::get("netsh_visible");
+    FILE* pipe = _popen(cmd.c_str(), "r");
+    if (!pipe) return aps;
+
+    std::array<char, 4096> buffer{};
+    std::string raw;
+    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+        raw += buffer.data();
+    }
+    _pclose(pipe);
+
+    std::istringstream iss(raw);
+    std::string line;
+    std::string current_ssid;
+
+    while (std::getline(iss, line)) {
+        // SSID line: "SSID 1 : MyNetwork"
+        if (line.find("SSID") != std::string::npos && line.find(':') != std::string::npos) {
+            auto pos = line.find(':');
+            current_ssid = line.substr(pos + 1);
+            while (!current_ssid.empty() && current_ssid[0] == ' ') current_ssid.erase(0, 1);
+            while (!current_ssid.empty() && (current_ssid.back() == ' ' || current_ssid.back() == '\r')) current_ssid.pop_back();
+            // Skip hidden SSIDs
+            if (current_ssid.empty()) continue;
+        }
+
+        // BSSID line: "BSSID 1 : aa:bb:cc:dd:ee:ff"
+        if (line.find("BSSID") != std::string::npos && line.find(':') != std::string::npos) {
+            // Check it's the BSSID line specifically (has MAC-like pattern)
+            auto pos = line.find(':');
+            std::string after_colon = line.substr(pos + 1);
+            while (!after_colon.empty() && after_colon[0] == ' ') after_colon.erase(0, 1);
+
+            // Check if it looks like a MAC address (xx:xx:xx:xx:xx:xx)
+            if (after_colon.size() >= 17 && after_colon[2] == ':' && after_colon[5] == ':') {
+                std::string mac = after_colon.substr(0, 17);
+
+                application::interfaces::WifiAccessPoint ap;
+                ap.ssid = current_ssid;
+                ap.bssid = mac;
+
+                // Read next lines to find Signal
+                std::string next_line;
+                while (std::getline(iss, next_line)) {
+                    if (next_line.find("Signal") != std::string::npos && next_line.find('%') != std::string::npos) {
+                        auto sp = next_line.find(':');
+                        if (sp != std::string::npos) {
+                            std::string sig_str = next_line.substr(sp + 1);
+                            while (!sig_str.empty() && sig_str[0] == ' ') sig_str.erase(0, 1);
+                            auto pct = sig_str.find('%');
+                            if (pct != std::string::npos) {
+                                sig_str = sig_str.substr(0, pct);
+                                try { ap.signal_percent = std::stoi(sig_str); }
+                                catch (...) {}
+                            }
+                        }
+                        break;
+                    }
+                    // Stop if we hit next SSID or BSSID
+                    if (next_line.find("SSID") != std::string::npos && next_line.find(':') != std::string::npos) {
+                        iss.seekg(-static_cast<int>(next_line.size()) - 1, std::ios_base::cur);
+                        break;
+                    }
+                    if (next_line.find("BSSID") != std::string::npos && next_line.find(':') != std::string::npos) {
+                        iss.seekg(-static_cast<int>(next_line.size()) - 1, std::ios_base::cur);
+                        break;
+                    }
+                }
+
+                aps.push_back(std::move(ap));
+            }
+        }
+    }
+
+    return aps;
 }
 
 } // namespace nuub::infrastructure::system

@@ -1,9 +1,13 @@
 #pragma once
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Psapi.h>
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <unordered_set>
@@ -186,7 +190,7 @@ public:
                 // (caller should call report_clean() or report_threat())
                 consecutive_clean_++;
                 if (consecutive_clean_ > 3) {
-                    current_interval_ = std::min(
+                    current_interval_ = (std::min)(
                         current_interval_ + std::chrono::milliseconds(1000),
                         max_interval_);
                 }
@@ -306,7 +310,7 @@ public:
                     // No change — gradually slow down
                     idle_counter_++;
                     if (idle_counter_ > 5) {
-                        poll_interval_ = std::min(
+                        poll_interval_ = (std::min)(
                             poll_interval_ + std::chrono::milliseconds(500),
                             max_interval_);
                     }

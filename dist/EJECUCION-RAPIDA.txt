@@ -1,0 +1,148 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                     GUIA DE EJECUCION RAPIDA - NUUB                      ║
+║                             v2.0 - FINAL                                 ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+⚡ FORMAS DE EJECUTAR NUUB:
+═════════════════════════════════════════════════════════════════════════════
+
+1️⃣  START MENU (MAS FACIL - RECOMENDADO)
+    ─────────────────────────────────────────────────────────────
+    • Presiona tecla Windows (logo de Windows)
+    • Empieza a escribir: NUUB
+    • Presiona Enter o haz click en el resultado
+    • ✓ NUUB ejecuta inmediatamente
+
+
+2️⃣  EXPLORADOR DE ARCHIVOS
+    ─────────────────────────────────────────────────────────────
+    • Abre Explorador (Windows + E)
+    • Navega a: C:\Users\TuNombre\AppData\Roaming\NUUB\bin
+    • Doble-click en: launcher.bat
+    • ✓ NUUB ejecuta
+
+
+3️⃣  TERMINAL / COMMAND PROMPT
+    ─────────────────────────────────────────────────────────────
+    • Abre Command Prompt (cmd.exe)
+    • Copia y pega:
+      
+      C:\Users\TuNombre\AppData\Roaming\NUUB\bin\launcher.bat
+    
+    • Presiona Enter
+    • ✓ NUUB ejecuta
+
+
+4️⃣  POWERSHELL
+    ─────────────────────────────────────────────────────────────
+    • Abre PowerShell
+    • Ejecuta esto:
+    
+      & 'C:\Users\TuNombre\AppData\Roaming\NUUB\bin\launch.ps1'
+    
+    • ✓ NUUB ejecuta
+
+
+❌ SI NUUB NO EJECUTA:
+═════════════════════════════════════════════════════════════════════════════
+
+Problema: Dice "No se encontró el archivo"
+Solución:
+  • Abre explorador (Windows + E)
+  • En la barra de direcciones, escribe: %APPDATA%
+  • Presiona Enter
+  • Busca la carpeta NUUB
+  • Si no existe, reinstala usando install.bat
+
+
+Problema: Error de "DLL no encontrado"
+Solución:
+  • Asegúrate de usar launcher.bat (no nuub.exe directamente)
+  • launcher.bat ajusta automáticamente el PATH
+
+
+Problema: La ventana se abre y se cierra rápidamente
+Solución:
+  • Es normal si no tienes configurado el token de Telegram
+  • NUUB pide configuración inicial (Bot Token, Admin ID, etc.)
+  • Sigue las instrucciones en pantalla
+
+
+📝 CONFIGURACION INICIAL:
+═════════════════════════════════════════════════════════════════════════════
+
+La primera vez que ejecutes NUUB, te pedirá:
+
+1. Bot Token de Telegram (@BotFather)
+2. Admin Chat ID (tu ID en Telegram)
+3. Configuración de comandos
+4. Claves de encriptación
+
+Estos datos se guardan en:
+  C:\Users\TuNombre\AppData\Roaming\NUUB\config
+
+
+🗑️  DESINSTALAR NUUB:
+═════════════════════════════════════════════════════════════════════════════
+
+Opcion 1 - Usar script de desinstalación:
+  • Abre Command Prompt
+  • Ejecuta:
+    
+    rmdir /s /q "%APPDATA%\NUUB"
+  
+  • Presiona S y Enter
+
+
+Opcion 2 - Manualmente:
+  • Abre Explorador
+  • Navega a: %APPDATA%\NUUB
+  • Haz clic derecho → Eliminar
+  • También elimina el acceso directo del Start Menu:
+    %APPDATA%\Microsoft\Windows\Start Menu\Programs\NUUB.lnk
+
+
+📍 UBICACIONES IMPORTANTES:
+═════════════════════════════════════════════════════════════════════════════
+
+Instalación principal:
+  C:\Users\TuNombre\AppData\Roaming\NUUB
+
+Ejecutable:
+  C:\Users\TuNombre\AppData\Roaming\NUUB\bin\nuub.exe
+
+Launcher (usa este para ejecutar):
+  C:\Users\TuNombre\AppData\Roaming\NUUB\bin\launcher.bat
+
+DLLs (librerías):
+  C:\Users\TuNombre\AppData\Roaming\NUUB\lib\
+
+Configuración:
+  C:\Users\TuNombre\AppData\Roaming\NUUB\config\
+
+
+💡 CONSEJOS:
+═════════════════════════════════════════════════════════════════════════════
+
+• Siempre usa launcher.bat (no nuub.exe directamente)
+  Esto garantiza que todas las DLLs se encuentren correctamente
+
+• Si creas un acceso directo personalizado, asegúrate que apunte a:
+  launcher.bat (o run-nuub.cmd)
+
+• Para debugging, usa PowerShell en lugar de cmd.exe
+  Da más información de errores
+
+• Los logs de NUUB se guardan en la carpeta de instalación
+
+
+════════════════════════════════════════════════════════════════════════════
+
+¿Necesitas ayuda? Revisa los archivos en la carpeta NUUB-USB-Installer:
+  • QUICK-START.txt - Guía de instalación
+  • README.txt - Información general
+
+═════════════════════════════════════════════════════════════════════════════
+                    Versión 2.0 | Actualizado: 2026-07-27
+═════════════════════════════════════════════════════════════════════════════

@@ -50,8 +50,11 @@ public:
         }
 
         typedef LONG (NTAPI* NtUnmapViewOfSection_t)(HANDLE, PVOID);
-        auto NtUnmapViewOfSection = reinterpret_cast<NtUnmapViewOfSection_t>(
-            GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtUnmapViewOfSection"));
+        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+        auto NtUnmapViewOfSection = ntdll
+            ? reinterpret_cast<NtUnmapViewOfSection_t>(
+                GetProcAddress(ntdll, "NtUnmapViewOfSection"))
+            : nullptr;
 
         if (NtUnmapViewOfSection && NtUnmapViewOfSection(pi.hProcess, image_base) != 0) {
             TerminateProcess(pi.hProcess, 0);

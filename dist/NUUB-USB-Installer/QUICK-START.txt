@@ -1,0 +1,121 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    NUUB - INSTALACION DESDE USB                          ║
+║                         QUICK START GUIDE v2.0                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+⚡ INSTALACION EN 3 PASOS (30 segundos)
+═════════════════════════════════════════════════════════════════════════════
+
+PASO 1: Copia toda la carpeta NUUB-USB-Installer a tu USB
+        O extrae NUUB-USB-Portable.zip en tu USB/Computer
+
+PASO 2: En tu PC, abre la carpeta NUUB-USB-Installer del USB
+
+PASO 3: Haz doble-click en uno de estos archivos:
+        
+        🔷 install.bat           ← RECOMENDADO (simple, sin requirements)
+        🔷 install.ps1           ← Si prefieres PowerShell
+        
+        ✓ El instalador detectará automáticamente todo
+        ✓ Se creará un acceso directo en tu Start Menu
+        ✓ Listo para usar!
+
+
+📍 DONDE SE INSTALA
+═════════════════════════════════════════════════════════════════════════════
+
+C:\Users\TuNombre\AppData\Roaming\NUUB
+                    ↓
+        Estructura después de instalar:
+        
+        NUUB/
+        ├── bin/
+        │   └── nuub.exe         ← Ejecutable principal
+        └── config/              ← Configuración (si existe)
+
+
+▶️  COMO EJECUTAR NUUB
+═════════════════════════════════════════════════════════════════════════════
+
+OPCION 1: Start Menu
+          • Busca "NUUB" en inicio (tecla Windows)
+          • Click en "NUUB"
+          • ✓ Inicia inmediatamente
+
+OPCION 2: Terminal / PowerShell
+          • Abre Command Prompt o PowerShell
+          • Escribe: nuub.exe
+          (solo si ejecutaste add-to-path.bat)
+
+OPCION 3: Explorador
+          • Navega a: C:\Users\TuNombre\AppData\Roaming\NUUB\bin
+          • Doble-click en nuub.exe
+
+
+🔧 OPCIONES ADICIONALES
+═════════════════════════════════════════════════════════════════════════════
+
+📌 Agregar a PATH (para usar desde terminal)
+   1. Dentro de USB-Installer, ejecuta: add-to-path.bat
+   2. Abre una nueva terminal (Ctrl+T en PowerShell, o nuevaCmd.exe)
+   3. Escribe: nuub.exe (desde cualquier carpeta)
+
+📌 Desinstalar NUUB
+   1. Dentro de USB-Installer, ejecuta: uninstall.bat
+   2. Se eliminará automáticamente de tu PC
+   3. El acceso directo también se remove
+
+📌 Actualizar (traer nueva versión desde USB)
+   1. Ejecuta install.bat nuevamente
+   2. Sobreescribe los archivos existentes
+   3. ✓ Actualización completada
+
+
+⚠️  REQUISITOS MINIMOS
+═════════════════════════════════════════════════════════════════════════════
+
+✓ Windows 10 o superior (x64)
+✓ Permiso de usuario estándar (admin recomendado para add-to-path.bat)
+✓ ~50 MB de espacio libre en AppData
+✓ USB con al menos 100 MB disponibles
+
+
+❓ TROUBLESHOOTING
+═════════════════════════════════════════════════════════════════════════════
+
+❌ "Permission Denied" al ejecutar install.bat
+   → Haz clic derecho en install.bat
+   → Selecciona "Run as Administrator"
+
+❌ No aparece en Start Menu después de instalar
+   → Presiona Windows + R
+   → Escribe: shell:startup
+   → Verifica que NUUB.lnk esté en esa carpeta
+
+❌ "nuub.exe not found" en terminal
+   → Abre una NUEVA ventana de terminal después de ejecutar add-to-path.bat
+   → El PATH se actualiza solo para nuevas sesiones
+
+❌ USB dañado o con problemas
+   → Descarga nuevamente NUUB-USB-Portable.zip
+   → Extrae en una nueva carpeta
+
+
+📞 SOPORTE
+═════════════════════════════════════════════════════════════════════════════
+
+Requerimientos técnicos:
+  • Lenguaje: C++ (compilado en Windows SDK 10.0.26100)
+  • Framework: Portable (sin dependencias externas)
+  • Instalador: Batch + PowerShell nativo de Windows
+
+Reportar problemas:
+  • Verifica que hayas usado install.bat (no extractado manualmente)
+  • Confirma que Windows 10/11 x64 está actualizado
+  • Lee el README.txt en la carpeta USB-Installer
+
+
+═════════════════════════════════════════════════════════════════════════════
+                    Versión: 2.0 | Build Date: 2026-07-27
+                   © NUUB Project | Instalador USB Portable
+═════════════════════════════════════════════════════════════════════════════

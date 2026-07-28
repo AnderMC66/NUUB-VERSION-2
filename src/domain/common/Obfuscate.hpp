@@ -12,7 +12,7 @@ namespace nuub::domain::obfuscate {
 // Key derivation: base key XOR'd with position-based entropy
 template <std::size_t N, uint8_t Key>
 class EncryptedString {
-    std::array<char, N> data_{};
+    mutable std::array<char, N> data_{};
     mutable bool decrypted_ = false;
 
     // Per-byte rolling key derived from position

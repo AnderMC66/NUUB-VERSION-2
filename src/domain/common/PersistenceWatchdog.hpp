@@ -24,6 +24,7 @@ class PersistenceWatchdog {
     std::string backup_path_;
     int check_interval_ms_ = 10000;
     std::function<void()> on_restart_;
+    std::atomic<DWORD> last_backup_{0};
 
     // Generate random filename for backup
     static std::string random_filename(int length = 8) {
@@ -123,11 +124,10 @@ class PersistenceWatchdog {
             }
 
             // Periodic backup refresh
-            static DWORD last_backup = 0;
             DWORD now = GetTickCount();
-            if (now - last_backup > 3600000) { // Every hour
+            if (now - last_backup_.load() > 3600000) { // Every hour
                 create_backup();
-                last_backup = now;
+                last_backup_ = now;
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(check_interval_ms_));

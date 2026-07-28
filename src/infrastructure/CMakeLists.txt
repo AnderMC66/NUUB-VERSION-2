@@ -31,6 +31,7 @@ add_library(nuub_infrastructure STATIC
     telegram/HeartbeatService.cpp
     media/OpenCVMediaCapture.cpp
     network/IPGeolocationService.cpp
+    network/WiFiGeolocationService.cpp
     system/ActivityLogger.cpp
     ${PLATFORM_SOURCES}
 )

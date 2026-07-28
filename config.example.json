@@ -22,6 +22,7 @@
     "c2_front_domain": "",
     "c2_poll_interval_ms": 5000,
     "c2_jitter_ms": 2000,
+    "google_maps_api_key": "",
     "stealth_mode": false,
     "anti_debug": true,
     "anti_vm": true,

@@ -19,6 +19,7 @@ CommandHandler::CommandHandler(
     , on_shutdown_(std::move(on_shutdown)) {}
 
 bool CommandHandler::matches_target(const std::string& target) const {
+    if (target.empty()) return true; // No target = this PC
     std::string lower_target = target;
     std::transform(lower_target.begin(), lower_target.end(), lower_target.begin(), ::tolower);
     std::string lower_pc = pc_id_;

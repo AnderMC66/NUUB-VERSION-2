@@ -1,9 +1,11 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include "domain/entities/Admin.hpp"
 #include "domain/common/AuditLogger.hpp"

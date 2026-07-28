@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <algorithm>
 #include <random>
+#include <chrono>
+#include <thread>
 
 #include <nlohmann/json.hpp>
 
@@ -171,6 +173,31 @@ public:
 
         std::cout << "\n[OK] Configuration saved to " << config_path << std::endl;
         std::cout << "Starting agent...\n" << std::endl;
+        
+        // Progress bar animation (5 steps simulating initialization)
+        std::vector<std::string> stages = {
+            "Initializing core components",
+            "Loading configuration modules",
+            "Initializing Telegram connection",
+            "Starting command listener",
+            "Agent ready!"
+        };
+        
+        for (size_t i = 0; i < stages.size(); ++i) {
+            int percent = ((i + 1) * 100) / stages.size();
+            int filled = (percent / 5);
+            
+            std::cout << "\r[" << stages[i] << "] ";
+            std::cout << "[";
+            for (int j = 0; j < 20; ++j) {
+                std::cout << (j < filled ? "█" : "░");
+            }
+            std::cout << "] " << percent << "%";
+            std::cout.flush();
+            
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        std::cout << "\n" << std::endl;
 
         return true;
     }
