@@ -2,7 +2,7 @@
     "name": "nuub-version-2",
     "version-semver": "2.0.0",
     "description": "Remote control agent with Clean Architecture",
-    "builtin-baseline": "c82f74667287d3dc386bce81e44964370c91a289",
+    "builtin-baseline": "0382773916ebb607ee34b4ec502bc0244ba1162e",
     "dependencies": [
         "nlohmann-json",
         "curl",
