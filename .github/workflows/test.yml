@@ -20,13 +20,12 @@ jobs:
       uses: lukka/run-vcpkg@v11
       id: runvcpkg
       with:
-        setupOnly: true
         vcpkgJsonGlob: vcpkg.json
 
     - name: Configure CMake
       run: >
         cmake -B build -S .
-        -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
+        -DCMAKE_TOOLCHAIN_FILE="${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake"
         -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
