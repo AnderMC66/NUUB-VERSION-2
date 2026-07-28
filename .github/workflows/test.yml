@@ -15,31 +15,18 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      id: runvcpkg
       with:
-        submodules: true
-
-    - name: Restore vcpkg cache
-      id: vcpkg-cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          vcpkg_installed
-          build/vcpkg_installed
-        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-
-    - name: Bootstrap vcpkg
-      shell: pwsh
-      run: .\vcpkg\bootstrap-vcpkg.bat
-
-    - name: Install dependencies (if not cached)
-      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: .\vcpkg\vcpkg install --triplet x64-windows
+        setupOnly: true
+        vcpkgJsonGlob: vcpkg.json
 
     - name: Configure CMake
       run: >
         cmake -B build -S .
-        -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
         -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
