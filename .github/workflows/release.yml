@@ -28,13 +28,13 @@ jobs:
           vcpkgGitCommitId: 'c82f74667287d3dc386bce81e44964370c91a289'
 
       - name: Install dependencies
-        run: vcpkg install --triplet x64-windows
+        run: vcpkg install --triplet x64-windows-static
 
       - name: Configure CMake
         run: >
           cmake -B build -S . -G "Visual Studio 17 2022" -A x64
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
-          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
       - name: Build Release
         run: cmake --build build --config Release
@@ -49,32 +49,12 @@ jobs:
           $staging = "release/stage"
           New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
-          # Copy exe
+          # Copy exe (static build - no DLLs needed)
           Copy-Item "build/Release/nuub.exe" -Destination $staging
-
-          # Copy required DLLs from vcpkg
-          $dllDir = "build/vcpkg_installed/x64-windows/bin"
-          $needed = @(
-            "argon2.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll",
-            "libcurl.dll", "zlib1.dll", "portaudio.dll", "sndfile.dll",
-            "fmt.dll", "spdlog.dll",
-            "opencv_core4.dll", "opencv_imgproc4.dll", "opencv_imgcodecs4.dll",
-            "opencv_videoio4.dll", "opencv_video4.dll", "opencv_highgui4.dll",
-            "opencv_img_hash4.dll", "jpeg62.dll", "libpng16.dll", "tiff.dll",
-            "turbojpeg.dll", "libwebp.dll", "libsharpyuv.dll",
-            "ogg.dll", "vorbis.dll", "vorbisfile.dll", "FLAC.dll",
-            "opus.dll", "mpg123.dll", "libmp3lame.dll",
-            "liblzma.dll", "libprotobuf-lite.dll",
-            "abseil_dll.dll"
-          )
-          foreach ($dll in $needed) {
-            $src = Join-Path $dllDir $dll
-            if (Test-Path $src) { Copy-Item $src -Destination $staging }
-          }
 
           # Copy tools and config
           Copy-Item "config.example.json" -Destination $staging
-          Copy-Item "tools/install.ps1" -Destination $staging
+          Copy-Item "tools/install-silent.ps1" -Destination $staging
 
           # Create zip
           $zipName = "nuub-$version.zip"

@@ -150,7 +150,7 @@ if (-not (Test-Path $vcpkgManifest)) {
 }
 
 Invoke-OrDie "Running vcpkg install" {
-    & $vcpkgExe install --triplet x64-windows
+    & $vcpkgExe install --triplet x64-windows-static
 }
 
 Write-OK "Dependencies installed"
@@ -165,7 +165,7 @@ Invoke-OrDie "Configuring CMake" {
     cmake -B $BuildDir -S $ProjectRoot `
         -DCMAKE_TOOLCHAIN_FILE=$toolchainFile `
         -DCMAKE_BUILD_TYPE=$BuildType `
-        -DVCPKG_TARGET_TRIPLET=x64-windows
+        -DVCPKG_TARGET_TRIPLET=x64-windows-static
 }
 
 Write-OK "CMake configured"
@@ -226,41 +226,12 @@ if (Test-Path $StagingDir) {
 }
 New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
 
-# Copy exe
+# Copy exe (static build - no DLLs needed)
 Copy-Item $exePath -Destination $StagingDir -Force
-
-# Copy required DLLs from vcpkg
-$VcpkgBin = Join-Path $BuildDir "vcpkg_installed\x64-windows\bin"
-if (Test-Path $VcpkgBin) {
-    $needed = @(
-        "argon2.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll",
-        "libcurl.dll", "zlib1.dll", "portaudio.dll", "sndfile.dll",
-        "fmt.dll", "spdlog.dll",
-        "opencv_core4.dll", "opencv_imgproc4.dll", "opencv_imgcodecs4.dll",
-        "opencv_videoio4.dll", "opencv_video4.dll", "opencv_highgui4.dll",
-        "opencv_img_hash4.dll", "jpeg62.dll", "libpng16.dll", "tiff.dll",
-        "turbojpeg.dll", "libwebp.dll", "libsharpyuv.dll",
-        "ogg.dll", "vorbis.dll", "vorbisfile.dll", "FLAC.dll",
-        "opus.dll", "mpg123.dll", "libmp3lame.dll",
-        "liblzma.dll", "libprotobuf-lite.dll",
-        "abseil_dll.dll"
-    )
-    $copied = 0
-    foreach ($dll in $needed) {
-        $src = Join-Path $VcpkgBin $dll
-        if (Test-Path $src) {
-            Copy-Item $src -Destination $StagingDir -Force
-            $copied++
-        }
-    }
-    Write-OK "Copied $copied DLLs to staging"
-} else {
-    Write-Warn "vcpkg bin directory not found: $VcpkgBin"
-}
 
 # Copy tools and config
 Copy-Item (Join-Path $ProjectRoot "config.example.json") -Destination $StagingDir -Force
-Copy-Item (Join-Path $PSScriptRoot "install.ps1") -Destination $StagingDir -Force
+Copy-Item (Join-Path $PSScriptRoot "install-silent.ps1") -Destination $StagingDir -Force
 
 # Create zip
 $zipName = "nuub-v$Version.zip"

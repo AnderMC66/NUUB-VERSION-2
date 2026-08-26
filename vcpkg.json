@@ -6,7 +6,11 @@
     "dependencies": [
         "nlohmann-json",
         "curl",
-        "opencv",
+        {
+            "name": "opencv",
+            "default-features": false,
+            "features": ["core", "imgcodecs", "imgproc", "videoio", "video"]
+        },
         "portaudio",
         "libsndfile",
         "gtest",

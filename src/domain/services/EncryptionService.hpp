@@ -13,7 +13,7 @@ class EncryptionService final : public IEncryptionService {
     std::uint32_t key_id_{1};
 
     static constexpr int ARGON2_TIME_COST = 4;
-    static constexpr int ARGON2_MEMORY_COST = 65536; // 64 MB
+    static constexpr int ARGON2_MEMORY_COST = 16384; // 16 MB (reduced from 64 MB)
     static constexpr int ARGON2_PARALLELISM = 4;
     static constexpr int SALT_SIZE = 32;
     static constexpr int KEY_LENGTH = 32;

