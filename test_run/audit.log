@@ -1,2 +1,26 @@
 2026-07-28 15:59:29.230 | event=AGENT_START pc=PC-Dev
 2026-07-28 15:59:56.032 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=locate | target= | allowed=yes
+2026-07-28 17:01:53.944 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=status | target= | allowed=yes
+2026-07-28 17:04:23.837 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=screenshot | target= | allowed=yes
+2026-07-28 17:04:46.258 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=take_photo | target= | allowed=yes
+2026-07-28 17:07:18.199 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=locate | target= | allowed=yes
+2026-07-28 17:07:51.167 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=ps | target= | allowed=yes
+2026-07-28 17:08:24.339 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=cat | target= | allowed=yes
+2026-07-28 17:08:30.483 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=cat | target= | allowed=yes
+2026-07-28 17:08:53.322 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=shellcode | target= | allowed=yes
+2026-07-28 17:09:14.065 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=wifi | target= | allowed=yes
+2026-08-24 12:31:42.097 | event=AGENT_START pc=PC-Dev
+2026-08-24 12:32:13.863 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=wifi | target= | allowed=yes
+2026-08-24 12:33:07.931 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=help | target= | allowed=yes
+2026-08-24 12:33:31.293 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=locate | target= | allowed=yes
+2026-08-24 12:34:14.962 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=screenshot | target= | allowed=yes
+2026-08-24 12:35:08.586 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=take_photo | target= | allowed=yes
+2026-08-24 12:36:02.239 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=getlog | target= | allowed=yes
+2026-08-24 12:36:20.457 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=info | target= | allowed=yes
+2026-08-24 12:36:54.862 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=medir | target=lucho | allowed=yes
+2026-08-24 12:37:05.920 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=mkdir | target=lucho | allowed=yes
+2026-08-24 12:37:24.557 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=clipboard | target= | allowed=yes
+2026-08-24 12:37:40.435 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=agents | target= | allowed=yes
+2026-08-24 12:38:02.294 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=is | target= | allowed=yes
+2026-08-24 12:38:10.853 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=screenshot | target= | allowed=yes
+2026-08-24 12:38:45.143 | admin=full@8254756798 | chat_id=8254756798 | perm=full | cmd=record_audio | target= | allowed=yes
