@@ -54,7 +54,7 @@ target_link_libraries(nuub_infrastructure PUBLIC
 # Platform-specific dependencies
 if(WIN32)
     find_package(portaudio CONFIG REQUIRED)
-    target_link_libraries(nuub_infrastructure PUBLIC portaudio ${PLATFORM_LIBS})
+    target_link_libraries(nuub_infrastructure PUBLIC portaudio::portaudio ${PLATFORM_LIBS})
 elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
