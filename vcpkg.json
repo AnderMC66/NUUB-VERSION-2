@@ -8,8 +8,7 @@
         "curl",
         {
             "name": "opencv",
-            "default-features": false,
-            "features": ["imgcodecs", "imgproc", "videoio", "video"]
+            "default-features": false
         },
         "portaudio",
         "libsndfile",
