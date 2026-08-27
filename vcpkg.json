@@ -7,7 +7,7 @@
         "nlohmann-json",
         "curl",
         {
-            "name": "opencv",
+            "name": "opencv4",
             "default-features": false
         },
         "portaudio",

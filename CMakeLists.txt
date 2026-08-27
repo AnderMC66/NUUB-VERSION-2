@@ -19,13 +19,13 @@ endif()
 # Compiler warnings
 include(cmake/CompilerWarnings.cmake)
 
-# Find packages
-find_package(CURL REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc videoio video)
-find_package(SndFile REQUIRED)
+# Find packages (only what the root executable and tests need directly)
 find_package(GTest CONFIG QUIET)
-find_package(unofficial-argon2 CONFIG REQUIRED)
+
+# Subdirectories handle their own dependencies:
+#   src/domain:       OpenSSL, argon2, spdlog, zlib
+#   src/application:  (none - pure logic)
+#   src/infrastructure: CURL, nlohmann_json, OpenCV, SndFile, portaudio
 
 # Subdirectories
 add_subdirectory(src/domain)

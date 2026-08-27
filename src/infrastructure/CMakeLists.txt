@@ -40,7 +40,7 @@ target_include_directories(nuub_infrastructure PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 find_package(CURL REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc videoio video)
+find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc videoio)
 find_package(SndFile REQUIRED)
 
 target_link_libraries(nuub_infrastructure PUBLIC
